@@ -460,17 +460,17 @@ const ValorMaximo = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                     </div>
                     
                     {isBudgetEditing ? (
-                        <div className="flex gap-2 mt-2">
+                        <div className="flex w-full gap-2 mt-2">
                             <input
                                 type="number"
                                 step="0.01"
                                 placeholder="R$ 0.00"
                                 value={valorMaximo}
                                 onChange={(e) => setValorMaximo(e.target.value)}
-                                className={`flex-grow border rounded-lg p-2 focus:ring-2 focus:outline-none ${modoNoturno ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400' : 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500'}`}
+                                className={`flex-grow w-2/3 border rounded-lg p-2 focus:ring-2 focus:outline-none ${modoNoturno ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400' : 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500'}`}
                             />
                             {/* handleSetBudget renomeado para handleSetMax */}
-                            <button onClick={() => handleSetMax(valorMaximo)} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition font-semibold">
+                            <button onClick={() => handleSetMax(valorMaximo)} className="bg-green-500 text-white px-4 py-2 w-1/3 rounded-lg hover:bg-green-600 transition font-semibold">
                                 Salvar
                             </button>
                         </div>

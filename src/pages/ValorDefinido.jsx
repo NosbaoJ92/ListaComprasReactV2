@@ -33,11 +33,12 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
     const [isBudgetEditing, setIsBudgetEditing] = useState(initialValorPreDefinido === '');
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // ESTADOS PARA O SCANNER/EAN
+    // ESTADOS E REFS PARA O SCANNER/EAN
     const [ean, setEan] = useState("");
     const [leitorAtivo, setLeitorAtivo] = useState(false);
     const codeReaderRef = useRef(null);
-    const videoRef = useRef(null); // Referência para o elemento de vídeo (scanner)
+    // Embora decodeFromConstraints use o ID, manter o ref é bom para práticas de React
+    const videoRef = useRef(null); 
 
 
     // EFEITOS (Carregar/Salvar)
@@ -88,7 +89,7 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
         // Limpa campos para evitar confusão de dados antigos
         setNomeProduto("");
         setValorProduto("");
-
+        setErro("");
 
         try {
             // 🔹 1️⃣ Tenta buscar no EANData
@@ -114,6 +115,7 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                     dataEan.product.attributes?.msrp ||
                     "";
 
+                setEan(codigoEan); // Garante que o EAN esteja no estado
                 setNomeProduto(nome);
                 setValorProduto(preco ? preco.toString() : "0");
                 
@@ -128,9 +130,10 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
 
             if (Array.isArray(dataMock) && dataMock.length > 0) {
                 const produtoMock = dataMock[0];
+                setEan(codigoEan); // Garante que o EAN esteja no estado
                 setNomeProduto(produtoMock.nome);
                 setValorProduto(produtoMock.valor ? produtoMock.valor.toString() : "0");
-               
+                
                 setTimeout(() => setErro(""), 2000);
                 return; // ✅ Encontrado no MockAPI
             }
@@ -149,40 +152,99 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
     };
 
 
-    // EFEITO: Lógica do Scanner
+    // EFEITO: Lógica do Scanner (COM SELEÇÃO INTELIGENTE DA CÂMERA TRASEIRA)
     useEffect(() => {
-        if (leitorAtivo && videoRef.current) {
-            // Inicializa o leitor apenas se não estiver inicializado
-            if (!codeReaderRef.current) {
-                codeReaderRef.current = new BrowserMultiFormatReader();
-            }
-
-            // Inicia a leitura do código de barras
-            codeReaderRef.current.decodeFromVideoDevice(undefined, videoRef.current, (result, err) => {
-                if (result) {
-                    const capturedEan = result.getText();
-                    setEan(capturedEan);
-                    
-                    // Chama handleSearchEan com o EAN capturado para iniciar a busca
-                    handleSearchEan(capturedEan); 
-                    
-                    // Desativa o leitor após a leitura
-                    handleScanClick(); 
-
-                }
-                if (err && !(err instanceof NotFoundException)) {
-                    // console.error(err);
-                }
-            });
-
-            // Parar o leitor ao sair do modo de leitura
-            return () => {
-                if (codeReaderRef.current) {
-                    codeReaderRef.current.reset();
-                }
-            };
+        // 1. Limpeza/Desativação
+        if (!leitorAtivo) {
+            if (codeReaderRef.current) codeReaderRef.current.reset();
+            return;
         }
-    }, [leitorAtivo]);
+
+        const initScanner = async () => {
+            try {
+                // Inicializa o leitor apenas se não estiver inicializado
+                if (!codeReaderRef.current) {
+                    codeReaderRef.current = new BrowserMultiFormatReader();
+                }
+                const codeReader = codeReaderRef.current;
+
+                // 2. Seleção da Câmera Traseira
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(d => d.kind === "videoinput");
+
+                console.log("Câmeras detectadas:", videoDevices.map(d => d.label));
+
+                // 🔍 tenta achar câmeras traseiras
+                const backCameras = videoDevices.filter(d =>
+                    /back|rear|environment|traseira/i.test(d.label)
+                );
+
+                // 🎯 Lógica de seleção (prioriza traseira, tenta a segunda se houver mais de uma)
+                let mainCamera;
+                if (backCameras.length >= 2) {
+                    mainCamera = backCameras[1];
+                } else if (backCameras.length === 1) {
+                    mainCamera = backCameras[0];
+                } else {
+                    // fallback para a primeira câmera disponível
+                    mainCamera = videoDevices.length > 0 ? videoDevices[0] : null;
+                }
+                
+                // Fallback final: tenta a segunda câmera se a primeira não funcionar
+                if (!mainCamera && videoDevices.length > 1) {
+                    mainCamera = videoDevices[1];
+                }
+
+                if (!mainCamera) throw new Error("Nenhuma câmera disponível.");
+
+                // 3. Definição das Restrições (Constraints)
+                const constraints = {
+                    video: {
+                        deviceId: { exact: mainCamera.deviceId },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        advanced: [{ focusMode: "continuous" }]
+                    }
+                };
+
+                // 4. Início da Leitura com Constraints
+                // O ID "video-scanner" DEVE CORRESPONDER ao ID no elemento <video> no JSX
+                await codeReader.decodeFromConstraints(constraints, "video-scanner", (result, err) => {
+                    if (result) {
+                        const capturedEan = result.getText();
+                        setEan(capturedEan);
+                        
+                        // Chama a função de busca
+                        handleSearchEan(capturedEan); 
+                        
+                        // Desativa o leitor após a leitura
+                        handleScanClick(); 
+                    }
+                    
+                    if (err && !(err instanceof NotFoundException)) {
+                        console.error("Erro durante a leitura:", err);
+                        // setErro(`Erro de leitura: ${err.message}`); // Opcional: mostrar erro
+                    }
+                });
+
+            } catch (err) {
+                console.error("Erro ao acessar a câmera:", err);
+                setErro("Erro ao acessar a câmera. Verifique as permissões ou tente outra câmera.");
+                setTimeout(() => setErro(""), 3000); 
+                setLeitorAtivo(false); // Desativa para evitar loops
+            }
+        };
+
+        initScanner();
+
+        // 5. Função de Limpeza
+        return () => {
+            if (codeReaderRef.current) {
+                codeReaderRef.current.reset();
+            }
+        };
+    // Dependências: Garante que o efeito re-execute quando 'leitorAtivo' mudar
+    }, [leitorAtivo]); 
     
     // --------------------------------------------------------
     // FIM DAS FUNÇÕES DO SCANNER/EAN
@@ -202,6 +264,13 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
         }
     };
 
+    const calcularTotalCompra = () => produtos.reduce((acc, produto) => acc + produto.total, 0);
+
+    const calcularRestante = () => {
+        const valorMaximo = parseFloat(valorPreDefinido.replace(',', '.')) || 0;
+        return valorMaximo - calcularTotalCompra();
+    };
+
     const handleOpenModal = (index = null) => {
         // --- BLOQUEIO DE ADIÇÃO SEM ORÇAMENTO ---
         if (index === null && !valorPreDefinido) {
@@ -213,11 +282,11 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
 
         if (index !== null) {
             const produto = produtos[index];
+            setEan(produto.ean || ""); // Carrega EAN para edição
             setNomeProduto(produto.nome);
             setValorProduto(produto.valor.toString());
             setQuantidadeProduto(produto.quantidade.toString());
             setEditandoIndex(index);
-            setEan('');
         } else {
             setNomeProduto('');
             setValorProduto('');
@@ -244,7 +313,7 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
         setEditandoIndex(null);
         setEan(''); // Limpar EAN
         
-        // Desliga o scanner se estiver ativo (handleScanClick já tem a lógica de reset)
+        // Desliga o scanner se estiver ativo
         if (leitorAtivo) { 
             handleScanClick(); 
         }
@@ -271,11 +340,27 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
         }
 
         const novoProduto = {
+            ean: ean || null, // Incluindo EAN
             nome: nomeProduto,
             valor: novoValor,
             quantidade: novaQtd,
             total: novoValor * novaQtd,
         };
+
+        // TERCEIRA VALIDAÇÃO: Orçamento
+        const totalAtualSemEste = editandoIndex !== null 
+            ? calcularTotalCompra() - produtos[editandoIndex].total 
+            : calcularTotalCompra();
+
+        const novoTotalGeral = totalAtualSemEste + novoProduto.total;
+        const valorMaximo = parseFloat(valorPreDefinido.replace(',', '.')) || 0;
+
+        if (novoTotalGeral > valorMaximo) {
+            setErro(`O valor total R$ ${novoTotalGeral.toFixed(2)} excede o orçamento de R$ ${valorMaximo.toFixed(2)}.`);
+            setTimeout(() => setErro(''), 5000);
+            return;
+        }
+
 
         if (editandoIndex !== null) {
             const produtosAtualizados = produtos.map((produto, index) =>
@@ -296,172 +381,142 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
     };
 
     const handleDeleteProduto = (index) => {
-        const produtosAtualizados = produtos.filter((_, i) => i !== index);
-        setProdutos(produtosAtualizados);
+        setProdutos(produtos.filter((_, i) => i !== index));
         setProdutoSelecionadoIndex(null);
-    };
-
-    const calcularTotalCompra = () => {
-        return produtos.reduce((acc, produto) => acc + produto.total, 0);
-    };
-
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            handleAddProduto();
-        }
     };
 
     const handleRowClick = (index) => {
         setProdutoSelecionadoIndex(index === produtoSelecionadoIndex ? null : index);
     };
 
-    // Limpa tudo (produtos e valor pré-definido)
-    const handleClearAll = () => {
-        const confirmClear = window.confirm("Tem certeza de que deseja limpar a lista de produtos E o valor do orçamento? Esta ação é irreversível.");
+    const gerarPDF = () => {
+        const doc = new jsPDF();
+        doc.text("Relatório de Orçamento e Compras", 10, 10);
+        doc.text(`Orçamento Máximo: R$ ${parseFloat(valorPreDefinido).toFixed(2)}`, 10, 18);
 
-        if (confirmClear) {
-            setProdutos([]);
-            setValorPreDefinido('');
-            setIsBudgetEditing(true);
-            localStorage.removeItem("produtosDefinido");
-            localStorage.removeItem("valorPreDefinido");
+        const tableColumn = ["EAN", "Nome", "Valor Unitário", "Quantidade", "Total"];
+        const tableRows = produtos.map((p) => [
+            p.ean || "-",
+            p.nome,
+            `R$ ${p.valor.toFixed(2)}`,
+            p.quantidade,
+            `R$ ${p.total.toFixed(2)}`
+        ]);
 
-            setProdutoSelecionadoIndex(null);
-            setErro('Lista de compras e orçamento foram limpos.');
-            setTimeout(() => setErro(''), 3000);
-        }
+        doc.autoTable({ head: [tableColumn], body: tableRows, startY: 25 });
+        const totalCompra = calcularTotalCompra().toFixed(2);
+        const restante = calcularRestante().toFixed(2);
+        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 35; 
+
+        doc.text(`Total Gasto: R$ ${totalCompra}`, 10, finalY + 10);
+        doc.text(`Orçamento Restante: R$ ${restante}`, 10, finalY + 17);
+        doc.save('lista-compras-orcamento.pdf');
     };
 
-    // FUNÇÕES DE PDF (Simuladas)
-    const gerarPDF = () => { 
-        setErro("Simulação de Geração de PDF Detalhado...");
-        setTimeout(() => setErro(""), 3000);
-    };
-    const gerarPDFSimplesParaImpressao = () => { 
-        setErro("Simulação de Geração de PDF Simples...");
-        setTimeout(() => setErro(""), 3000);
-    };
+    // Estilos dinâmicos do progresso
+    const valorMaximo = parseFloat(valorPreDefinido.replace(',', '.')) || 1; // Evita divisão por zero
+    const totalGasto = calcularTotalCompra();
+    const percentual = Math.min((totalGasto / valorMaximo) * 100, 100);
+    const corProgresso = percentual >= 90 ? 'bg-red-500' : percentual >= 70 ? 'bg-yellow-500' : 'bg-green-500';
 
-    const totalCompraCalculado = calcularTotalCompra().toFixed(2);
-    const valorRestanteCalculado = (parseFloat(valorPreDefinido || 0) - parseFloat(totalCompraCalculado)).toFixed(2);
-    const isOverBudget = valorRestanteCalculado < 0;
-
-    // Classe condicional para os inputs do modal
-    const inputModalClasses = `border rounded-lg p-3 w-full text-base focus:ring-blue-500 focus:border-blue-500 
-                              ${modoNoturno ? 'bg-gray-700 text-gray-100 border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`;
-
-    // --- RENDERIZAÇÃO DO COMPONENTE ---
     return (
-        <div className={`min-h-screen relative flex flex-col transition-colors duration-500 ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
-
-            {/* Botões fixos (Home/Tema) */}
-            {onGoHome && (
-                <button
-                    onClick={onGoHome}
-                    className="fixed top-4 left-4 z-50 p-3 rounded-full shadow-lg transition duration-300 text-sm font-semibold
-                                        bg-white text-gray-800 hover:bg-gray-200
-                                        dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
-                >
-                    🏠
-                </button>
-            )}
-            <button
-                onClick={onToggleModoNoturno}
-                className="fixed top-4 right-4 z-50 p-3 rounded-full shadow-lg transition duration-300 text-sm font-semibold
-                                        bg-white text-gray-800 hover:bg-gray-200
-                                        dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
-            >
+        <div className={`min-h-screen p-6 relative flex flex-col ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
+            <button onClick={onGoHome} className="fixed top-4 left-4 z-50 p-3 rounded-full shadow-lg transition duration-300 bg-white text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">🏠</button>
+            <button onClick={onToggleModoNoturno} className="fixed top-4 right-4 z-50 p-3 rounded-full shadow-lg transition duration-300 bg-white text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
                 {modoNoturno ? '☀️' : '🌙'}
             </button>
 
-            {/* CABEÇALHO FIXO (Título, Orçamento e Resumo) */}
-            <header className={`sticky top-0 z-40 w-full transition-colors duration-500 pt-16 pb-4 ${modoNoturno ? 'bg-gray-900' : 'bg-gray-100'}`}>
-                <div className="container mx-auto max-w-4xl px-6">
-                    <h1 className="text-center text-4xl font-extrabold pb-4">
-                        Controle de Orçamento 🎯
-                    </h1>
+            <div className="container mx-auto max-w-4xl pt-8 flex-grow">
+                <h1 className="py-4 text-center text-4xl font-extrabold">Gerenciador de Orçamento 💰</h1>
 
-                    {/* Seção de Valor Pré-Definido (Fixo/Editável) */}
-                    <div className={`p-4 rounded-xl shadow-lg border-2 mb-4 ${isOverBudget ? 'border-red-500' : 'border-blue-500'} ${modoNoturno ? 'bg-gray-800' : 'bg-white'}`}>
-                        <div className="flex justify-between items-center mb-3">
-                            <label className="text-lg font-semibold">Orçamento Máximo (R$)</label>
-                            {/* Botão de Editar visível apenas fora do modo de edição */}
-                            {!isBudgetEditing && (
-                                <button
-                                    onClick={() => setIsBudgetEditing(true)}
-                                    className="bg-orange-500 text-white font-semibold rounded-lg p-2 px-4 text-sm hover:bg-orange-600 transition"
-                                >
-                                    Editar
-                                </button>
-                            )}
-                        </div>
-
-                        {isBudgetEditing ? (
-                            <div className='flex gap-2'>
-                                <input
-                                    type="number"
-                                    placeholder="Ex: 100.00"
-                                    value={valorPreDefinido}
-                                    onChange={(e) => setValorPreDefinido(e.target.value)}
-                                    className={`border rounded-lg p-2 w-full text-lg focus:ring-blue-500 focus:ring-2 focus:ring-offset-2 ${modoNoturno ? 'bg-gray-700 text-gray-100 border-gray-600' : 'bg-gray-50 text-gray-900 border-gray-300'}`}
-                                />
-                                <button
-                                    onClick={() => handleSetBudget(valorPreDefinido)}
-                                    className="bg-green-500 text-white font-semibold rounded-lg p-2 px-4 hover:bg-green-600 transition"
-                                >
-                                    Salvar
-                                </button>
-                            </div>
-                        ) : (
-                            <div className='flex justify-between items-center'>
-                                <p className='text-3xl font-bold text-blue-600 dark:text-blue-400'>
-                                    R$ {parseFloat(valorPreDefinido || 0).toFixed(2)}
-                                </p>
-                            </div>
-                        )}
+                {/* ----------------------------------------------------------------- */}
+                {/* ORÇAMENTO MÁXIMO (Budget Block) */}
+                {/* ----------------------------------------------------------------- */}
+                <div className={`p-4 mb-6 rounded-xl shadow-xl ${modoNoturno ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}>
+                    <div className="flex justify-between items-start">
+                        <h2 className="text-xl font-bold mb-2">Orçamento Máximo Definido</h2>
+                        <button 
+                            onClick={() => setIsBudgetEditing(true)} 
+                            className={`p-2 rounded-full transition ${modoNoturno ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                            title="Editar Orçamento">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+                                <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
+                            </svg>
+                        </button>
                     </div>
+                    
+                    {isBudgetEditing ? (
+                        <div className="flex gap-2 mt-2">
+                            <input
+                                type="number"
+                                step="0.01"
+                                placeholder="R$ 0.00"
+                                value={valorPreDefinido}
+                                onChange={(e) => setValorPreDefinido(e.target.value)}
+                                className={`flex-grow border rounded-lg p-2 focus:ring-2 focus:outline-none ${modoNoturno ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400' : 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500'}`}
+                            />
+                            <button onClick={() => handleSetBudget(valorPreDefinido)} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition font-semibold">
+                                Salvar
+                            </button>
+                        </div>
+                    ) : (
+                        <p className="text-3xl font-extrabold text-blue-500 mt-1">
+                            R$ {parseFloat(valorPreDefinido).toFixed(2).replace('.', ',')}
+                        </p>
+                    )}
+
+                    {/* Barra de Progresso e Totais */}
+                    {!isBudgetEditing && valorPreDefinido && (
+                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <h3 className="font-semibold mb-2">Resumo da Compra</h3>
+                            <div className="flex justify-between font-medium text-lg">
+                                <span>Gasto Atual:</span>
+                                <span className="text-green-500">R$ {calcularTotalCompra().toFixed(2).replace('.', ',')}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-xl mt-1">
+                                <span>Restante:</span>
+                                <span className={calcularRestante() < 0 ? 'text-red-500' : 'text-blue-500'}>
+                                    R$ {calcularRestante().toFixed(2).replace('.', ',')}
+                                </span>
+                            </div>
+                            
+                            {/* Barra de Progresso */}
+                            <div className="w-full bg-gray-200 rounded-full h-3 mt-3 dark:bg-gray-700">
+                                <div className={`${corProgresso} h-3 rounded-full transition-all duration-500`} style={{ width: `${percentual}%` }}></div>
+                            </div>
+                            <p className="text-sm text-right mt-1 text-gray-500 dark:text-gray-400">
+                                {percentual.toFixed(1)}% do orçamento gasto.
+                            </p>
+                        </div>
+                    )}
                 </div>
-            </header>
 
-            {/* Conteúdo que ROLA (Tabela, Botões e Totais Finais) */}
-            <div className="container mx-auto max-w-4xl px-6 flex-grow overflow-y-auto mt-2 ">
-
-                {/* Mensagem de Erro (Fica fixa, se houver) */}
-                {erro && (
-                    <div className={`p-3 mb-4 rounded-lg font-semibold text-center ${erro.includes('Orçamento') ? 'bg-yellow-400 text-gray-900' : 'bg-red-500 text-white'}`}>
-                        {erro}
-                    </div>
-                )}
-
-                {/* Área da Tabela */}
-                <div className={`p-4 mb-4 rounded-xl shadow-lg overflow-y-scroll max-h-96 border ${modoNoturno ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-                    {/* CABEÇALHO DA TABELA (Desktop/Tablet) */}
-                    <div className="hidden sm:block border-b-2 border-gray-300 dark:border-gray-600">
-                        <div className="flex uppercase text-sm font-bold w-full">
-                            <div className={`px-4 py-3 text-left ${COL_NOME}`}>Produto</div>
-                            <div className={`px-4 py-3 text-right ${COL_VALOR}`}>Valor Und.</div>
-                            <div className={`px-4 py-3 text-center ${COL_QTD}`}>Qtd.</div>
-                            <div className={`px-4 py-3 text-right ${COL_TOTAL}`}>Total</div>
-                        </div>
-                    </div>
-
-                    {/* CORPO DA TABELA */}
-                    <div>
+                {/* ----------------------------------------------------------------- */}
+                {/* LISTA DE PRODUTOS */}
+                {/* ----------------------------------------------------------------- */}
+                <div className={`p-4 mt-4 rounded-xl shadow-lg border ${modoNoturno ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                    <div className="overflow-y-scroll max-h-96">
                         {produtos.length === 0 ? (
                             <div className="text-center py-10">
-                                <p className="font-semibold text-lg mb-2">Lista de itens vazia. 📝</p>
-                                <p>Adicione produtos para subtrair do seu orçamento.</p>
+                                <p className="font-semibold text-lg mb-2">Sua lista de compras está vazia. 📝</p>
+                                <p>Defina o orçamento e clique em <b>'+ Adicionar Produto'</b> para começar!</p>
                             </div>
                         ) : (
                             <div>
+                                {/* Desktop Header */}
+                                <div className="hidden sm:flex w-full border-b border-gray-300 dark:border-gray-600 font-bold text-sm text-gray-500 dark:text-gray-400">
+                                    <div className={`px-4 py-2 ${COL_NOME}`}>Produto</div>
+                                    <div className={`px-4 py-2 text-right ${COL_VALOR}`}>Valor Und.</div>
+                                    <div className={`px-4 py-2 text-center ${COL_QTD}`}>Qtd.</div>
+                                    <div className={`px-4 py-2 text-right ${COL_TOTAL}`}>Total</div>
+                                </div>
                                 {produtos.map((produto, index) => (
-                                    <div
-                                        key={index}
-                                        onClick={() => handleRowClick(index)}
+                                    <div key={index} onClick={() => handleRowClick(index)}
                                         className={`flex flex-col sm:flex-row border-b dark:border-gray-700 transition duration-100 cursor-pointer w-full relative
-                                                        ${index === produtoSelecionadoIndex ? 'bg-blue-100/50 dark:bg-blue-900/70' : (index % 2 === 0 ? ' ' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50')}`}
-                                    >
-                                        {/* LAYOUT MOBILE (Detalhes do Cartão) */}
+                                        ${index === produtoSelecionadoIndex ? 'bg-blue-100/50 dark:bg-blue-900/70' : (index % 2 === 0 ? ' ' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50')}`}>
+                                        
+                                        {/* Mobile layout */}
                                         <div className={`p-4 sm:hidden w-full`}>
                                             <div className="font-extrabold text-lg mb-2">{produto.nome}</div>
                                             <div className="grid grid-cols-3 gap-y-1 gap-x-4 text-sm">
@@ -479,8 +534,8 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                                                 </div>
                                             </div>
                                         </div>
-
-                                        {/* LAYOUT DESKTOP (Linhas da Tabela) */}
+                                        
+                                        {/* Desktop layout */}
                                         <div className="hidden sm:flex w-full">
                                             <div className={`px-4 py-3 text-left flex items-center ${COL_NOME}`}>{produto.nome}</div>
                                             <div className={`px-4 py-3 text-right flex items-center justify-end ${COL_VALOR}`}>R$ {produto.valor.toFixed(2)}</div>
@@ -488,22 +543,21 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                                             <div className={`px-4 py-3 font-semibold text-right flex items-center justify-end ${COL_TOTAL} text-lg text-green-600 dark:text-green-400`}>R$ {produto.total.toFixed(2)}</div>
                                         </div>
 
-                                        {/* POP-UP DE AÇÕES */}
+                                        {/* Ações (Editar/Excluir) */}
                                         {index === produtoSelecionadoIndex && (
                                             <div className="absolute top-1/2 right-4 transform -translate-y-1/2 flex gap-2 z-20 p-4 rounded-lg bg-white/70 backdrop-blur-sm dark:bg-gray-900/70 shadow-md">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleEditProduto(index); }}
-                                                    className="p-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition"
-                                                    title="Editar"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" /></svg>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); handleEditProduto(index); }} 
+                                                    className="p-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition" title="Editar">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+                                                        <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
+                                                    </svg>
                                                 </button>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleDeleteProduto(index); }}
-                                                    className="p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition"
-                                                    title="Excluir"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteProduto(index); }}className="p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition" title="Excluir">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                    </svg>
                                                 </button>
                                             </div>
                                         )}
@@ -512,172 +566,196 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                             </div>
                         )}
                     </div>
-                </div>
 
-                {/* Botões de Ação da Tabela */}
-                <div className="p-4 mb-6 text-center flex flex-col sm:flex-row justify-center gap-4">
-                    <button
-                        onClick={() => handleOpenModal()}
-                        className="bg-blue-600 text-white font-semibold rounded-lg p-3 px-8 hover:bg-blue-700 transition shadow-lg w-full sm:w-auto"
-                    >
-                        + Adicionar Novo Produto
-                    </button>
-                </div>
-
-                {/* Saldo Restante e Total de Compras */}
-                <div className={`p-4 rounded-xl shadow-lg border-2 mb-6 ${isOverBudget ? 'border-red-500 bg-red-100/30 dark:bg-red-900/40' : 'border-green-500 bg-green-100/30 dark:bg-green-900/40'} font-bold`}>
-                    <div className="flex justify-between items-center mb-2 border-b pb-2 border-gray-300 dark:border-gray-600">
-                        <h3 className="text-xl">Total de Compras:</h3>
-                        <span className="text-2xl text-green-600 dark:text-green-400">R$ {totalCompraCalculado}</span>
-                    </div>
-                    <div className="flex justify-between items-center pt-2">
-                        <h3 className="text-2xl">Saldo Restante:</h3>
-                        <span className={`text-3xl ${isOverBudget ? 'text-red-700 dark:text-red-400' : 'text-green-700 dark:text-green-400'}`}>
-                            R$ {valorRestanteCalculado}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Rodapé da Página: Botões de PDF e Limpar Tudo */}
-                <div className="flex flex-col sm:flex-row justify-between w-full mt-4 pb-6 gap-4">
-                    {/* <div className="flex gap-4">
-                        <button
-                            onClick={gerarPDF}
-                            className="bg-gray-500 text-white font-semibold rounded-lg p-3 px-8 hover:bg-gray-600 transition shadow-lg w-full sm:w-auto"
-                        >
-                            Exportar PDF
-                        </button>
-                        <button
-                            onClick={gerarPDFSimplesParaImpressao}
-                            className="bg-gray-500 text-white font-semibold rounded-lg p-3 px-8 hover:bg-gray-600 transition shadow-lg w-full sm:w-auto"
-                        >
-                            Imprimir
-                        </button>
-                    </div> */}
-                    <button
-                        onClick={handleClearAll}
-                        className="bg-red-500 text-white font-semibold rounded-lg p-3 px-8 hover:bg-red-600 transition shadow-lg w-full sm:w-auto mt-4 sm:mt-0"
-                    >
-                        🗑️ Limpar Tudo
-                    </button>
-                </div>
-            </div>
-
-            {/* MODAL DE ADICIONAR/EDITAR PRODUTO */}
-            {isModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4">
-                    <div className={`rounded-xl p-8 w-full max-w-md shadow-2xl ${modoNoturno ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'}`}>
-                        {/* Título */}
-                        <h2 className={`text-2xl font-bold mb-6 text-center ${modoNoturno ? 'text-gray-100' : 'text-gray-900'}`}>
-                            {editandoIndex !== null ? 'Editar Produto' : 'Adicionar Produto'}
-                        </h2>
-
-                        {leitorAtivo && (
-                        <div className="mb-4">
-                            <div className="relative w-full h-48 bg-black rounded-lg overflow-hidden">
-                                <video ref={videoRef} className="w-full h-full object-cover" autoPlay autoFocus focusMode muted />
-                                
-                                {/* Linha vermelha central */}
-                                <div className="absolute top-1/2 left-0 w-full h-[2px] bg-red-500 transform -translate-y-1/2 pointer-events-none"></div>
-
-                                {/* Borda do scanner (opcional) */}
-                                <div className="absolute inset-0 border-4 border-green-500 opacity-60 pointer-events-none"></div>
-                            </div>
-
-                            <p className="text-xs text-gray-400 mt-2">
-                                Aponte a câmera para o código de barras (EAN). O preenchimento será automático.
-                            </p>
-                        </div>
-                        )}
-
-                        <div className="space-y-4">
-                            {/* 1. EAN INPUT (Full Width) */}
-                            <input
-                                type="text"
-                                placeholder="EAN do Produto"
-                                value={ean}
-                                onChange={(e) => setEan(e.target.value)}
-                                disabled={leitorAtivo}
-                                className={inputModalClasses} // Classe condicional aplicada
-                            />
-
-                            {/* 2. BOTÕES DE AÇÃO DO EAN (Lado a Lado) */}
-                            <div className="flex gap-4">
-                                <button
-                                    onClick={() => handleSearchEan(ean)} 
-                                    className="bg-blue-600 text-white font-semibold rounded-lg p-3 w-1/2 hover:bg-blue-700 transition shadow-md"
-                                >
-                                    Buscar
-                                </button>
-                                <button
-                                    onClick={handleScanClick}
-                                    className={`font-semibold rounded-lg p-3 w-1/2 transition shadow-md
-                                        ${leitorAtivo ? 'bg-red-500 hover:bg-red-600' : 'bg-green-600 hover:bg-green-700'} text-white
-                                    `}
-                                >
-                                    {leitorAtivo ? 'Parar Leitor' : 'Ler Código'}
-                                </button>
-                            </div>
-                            
-                            {/* 3. NOME DO PRODUTO (Full Width) */}
-                            <input
-                                type="text"
-                                placeholder="Nome do Produto"
-                                value={nomeProduto}
-                                onChange={(e) => setNomeProduto(e.target.value)}
-                                className={inputModalClasses} // Classe condicional aplicada
-                            />
-
-                            {/* 4. VALOR E QUANTIDADE (Lado a Lado) */}
-                            <div className="flex gap-4">
-                                <input
-                                    type="number"
-                                    placeholder="Valor (R$)"
-                                    value={valorProduto}
-                                    onChange={(e) => setValorProduto(e.target.value)}
-                                    className={inputModalClasses.replace('w-full', 'w-1/2')} // Classe condicional aplicada
-                                />
-                                <input
-                                    type="number"
-                                    placeholder="Quantidade"
-                                    value={quantidadeProduto}
-                                    onChange={(e) => setQuantidadeProduto(e.target.value)}
-                                    onKeyDown={handleKeyDown}
-                                    className={inputModalClasses.replace('w-full', 'w-1/2')} // Classe condicional aplicada
-                                />
-                            </div>
-                        </div>
-
-                        {/* Mensagem de erro dentro do Modal */}
-                        {erro && (
-                            <p className={`font-medium mt-4 ${modoNoturno ? 'text-red-400' : 'text-red-500'}`}>{erro}</p>
-                        )}
-
-                        {/* 5. BOTÕES DE AÇÃO PRINCIPAL (Lado a Lado - Fundo do Modal) */}
-                        <div className="mt-6 flex gap-4">
-                            {/* Botão Adicionar/Atualizar (Azul) */}
-                            <button
-                                onClick={handleAddProduto}
-                                className="bg-blue-600 text-white font-semibold rounded-lg p-3 hover:bg-blue-700 transition w-1/2 shadow-md"
-                            >
-                                {editandoIndex !== null ? 'Atualizar Produto' : 'Adicionar Produto'}
+                    {produtos.length > 0 && (
+                        <div className="flex justify-between items-center border-t-4 border-green-500 font-bold p-4 mt-2">
+                            <button 
+                                onClick={gerarPDF} 
+                                className="bg-gray-500 text-white px-3 py-1 rounded-lg hover:bg-gray-600 transition font-semibold text-sm">
+                                Exportar PDF 📄
                             </button>
-                            {/* Botão Cancelar (Cinza) - AGORA OTIMIZADO */}
-                            <button
-                                onClick={handleCloseModal} 
-                                disabled={leitorAtivo} 
-                                className={`font-semibold rounded-lg p-3 transition w-1/2 shadow-md 
-                                    ${leitorAtivo 
-                                        ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
-                                        : 'bg-red-500 text-white hover:bg-red-600' // Estilo padrão para o Cancelar
+                            <span className="text-2xl text-green-600 dark:text-green-400">
+                                Total: R$ {calcularTotalCompra().toFixed(2).replace('.', ',')}
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Botão Adicionar e Gerar PDF (se houver produtos) */}
+                <div className="container mx-auto max-w-4xl flex justify-between items-center w-full mt-4">
+                    <button 
+                        onClick={() => handleOpenModal()} 
+                        className={`bg-blue-600 text-white px-4 py-2 rounded-lg ${!valorPreDefinido ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700 transition'} font-semibold`}
+                        disabled={!valorPreDefinido}
+                    >
+                        + Adicionar Produto
+                    </button>
+                </div>
+
+                {/* ----------------------------------------------------------------- */}
+                {/* MODAL DE PRODUTO */}
+                {/* ----------------------------------------------------------------- */}
+                {isModalOpen && (
+                    <div
+                        className={`fixed inset-0 z-50 flex justify-center items-center p-4 transition-all ${
+                            modoNoturno ? 'bg-gray-900/80 text-gray-100' : 'bg-black/60 text-gray-900'
+                        }`}
+                    >
+                        <div
+                            className={`w-full max-w-lg p-8 rounded-2xl shadow-2xl transition-all duration-300 ${
+                                modoNoturno
+                                    ? 'bg-gray-800 border border-gray-700'
+                                    : 'bg-white border border-gray-200'
+                            }`}
+                        >
+                            <h1
+                                className={`text-2xl font-bold mb-6 text-center ${
+                                    modoNoturno ? 'text-white' : 'text-gray-900'
+                                }`}
+                            >
+                                {editandoIndex !== null ? "Editar Produto" : "Adicionar Produto"}
+                            </h1>
+
+
+                            {leitorAtivo && (
+                                <div className="mb-4">
+                                    <div className="relative w-full h-48 bg-black rounded-lg overflow-hidden">
+                                        {/* A tag <video> DEVE ter o ID "video-scanner" */}
+                                        <video 
+                                            id="video-scanner" // <--- ID Crucial para o Scanner
+                                            ref={videoRef} 
+                                            className="w-full h-full object-cover" 
+                                            autoPlay 
+                                            autoFocus 
+                                            focusMode 
+                                            muted 
+                                        />
+                                        
+                                        {/* Linha vermelha central */}
+                                        <div className="absolute top-1/2 left-0 w-full h-[2px] bg-red-500 transform -translate-y-1/2 pointer-events-none"></div>
+                                        {/* Borda do scanner (opcional) */}
+                                        <div className="absolute inset-0 border-4 border-green-500 opacity-60 pointer-events-none"></div>
+                                    </div>
+
+                                    <p className="text-xs text-gray-400 mt-2">
+                                        Aponte a câmera para o código de barras (EAN). O preenchimento será automático.
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="flex flex-col gap-4 mb-4">
+                                {/* Campo EAN */}
+                                <input
+                                    type="number"
+                                    placeholder="EAN do Produto (opcional)"
+                                    value={ean}
+                                    onChange={(e) => setEan(e.target.value)}
+                                    className={`border rounded-xl p-3 focus:ring-2 focus:outline-none transition ${
+                                        modoNoturno
+                                            ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400'
+                                            : 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500'
                                     }`}
-                            >
-                                {leitorAtivo ? 'Leitor Ativo...' : 'Cancelar'}
-                            </button>
+                                />
+
+                                {/* Botões: Buscar e Ler Código */}
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => handleSearchEan()}
+                                        className={`flex-1 font-semibold rounded-xl py-2.5 shadow-sm transition-all active:scale-95 ${
+                                            modoNoturno
+                                                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        }`}
+                                    >
+                                        Buscar EAN
+                                    </button>
+
+                                    <button
+                                        onClick={handleScanClick}
+                                        className={`flex-1 font-semibold rounded-xl py-2.5 shadow-sm transition-all active:scale-95 ${
+                                            leitorAtivo
+                                                ? 'bg-red-600 text-white hover:bg-red-700'
+                                                : modoNoturno
+                                                ? 'bg-green-500 text-white hover:bg-green-600'
+                                                : 'bg-green-600 text-white hover:bg-green-700'
+                                        }`}
+                                    >
+                                        {leitorAtivo ? "Parar Leitura" : "Ler Código"}
+                                    </button>
+                                </div>
+
+                                {/* Campos de informações */}
+                                <input
+                                    type="text"
+                                    placeholder="Nome do Produto"
+                                    value={nomeProduto}
+                                    onChange={(e) => setNomeProduto(e.target.value)}
+                                    className={`border rounded-xl p-3 focus:ring-2 focus:outline-none transition ${
+                                        modoNoturno
+                                            ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400'
+                                            : 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500'
+                                    }`}
+                                />
+
+                                <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="Valor (R$)"
+                                        value={valorProduto}
+                                        onChange={(e) => setValorProduto(e.target.value)}
+                                        className={`border rounded-xl p-3 focus:ring-2 focus:outline-none transition ${
+                                            modoNoturno
+                                                ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400'
+                                                : 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500'
+                                        }`}
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Quantidade"
+                                        value={quantidadeProduto}
+                                        onChange={(e) => setQuantidadeProduto(e.target.value)}
+                                        className={`border rounded-xl p-3 focus:ring-2 focus:outline-none transition ${
+                                            modoNoturno
+                                                ? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400'
+                                                : 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500'
+                                        }`}
+                                    />
+                                </div>
+
+                                {/* Botões: Adicionar/Atualizar e Cancelar */}
+                                <div className="flex gap-3 mt-2">
+                                    <button
+                                        onClick={handleAddProduto}
+                                        className={`flex-1 font-semibold rounded-xl py-2.5 shadow-sm transition-all active:scale-95 ${
+                                            modoNoturno
+                                                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        }`}
+                                    >
+                                        {editandoIndex !== null ? "Atualizar Produto" : "Adicionar Produto"}
+                                    </button>
+                                    <button
+                                        onClick={handleCloseModal}
+                                        disabled={leitorAtivo}
+                                        className={`flex-1 font-semibold rounded-xl py-2.5 shadow-sm transition-all active:scale-95 ${
+                                            leitorAtivo
+                                                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                                                : modoNoturno
+                                                ? 'bg-red-500 text-white hover:bg-red-600'
+                                                : 'bg-red-600 text-white hover:bg-red-700'
+                                        }`}
+                                    >
+                                        {leitorAtivo ? "Leitor Ativo..." : "Cancelar"}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {erro && <p className="text-red-500 font-medium mt-2">{erro}</p>}
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 };

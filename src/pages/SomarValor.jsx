@@ -98,9 +98,6 @@ const SomarValor = ({ onGoHome }) => {
     }
   };
 
-
-
-
   // 🔹 Scanner
     useEffect(() => {
     if (!leitorAtivo) {

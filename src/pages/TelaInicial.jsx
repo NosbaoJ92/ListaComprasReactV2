@@ -65,7 +65,7 @@ const TelaInicial = ({ onSelectOption }) => {
       </button>
 
       <div className="w-full max-w-xl mt-16">
-        <h1 className="text-3xl font-extrabold text-center mb-10">
+        <h1 className="py-4 p-8 text-center text-4xl font-extrabold mb-10">
           Bem-vindo à Lista de Compras - Online
         </h1>
         

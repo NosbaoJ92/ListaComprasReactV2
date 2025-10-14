@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { BrowserMultiFormatReader, NotFoundException } from "@zxing/library";
 
 // Definições de Largura OTIMIZADAS (para manter a consistência visual)
@@ -28,6 +26,9 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
     const [erro, setErro] = useState('');
     const [editandoIndex, setEditandoIndex] = useState(null);
     const [produtoSelecionadoIndex, setProdutoSelecionadoIndex] = useState(null);
+    
+    // NOVO ESTADO para controlar o aviso de estouro de orçamento SEM BLOQUEAR a ação
+    const [avisoEstouro, setAvisoEstouro] = useState(''); 
 
     // isBudgetEditing inicializa como TRUE se valorPreDefinido for vazio
     const [isBudgetEditing, setIsBudgetEditing] = useState(initialValorPreDefinido === '');
@@ -51,7 +52,21 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
 
     useEffect(() => {
         localStorage.setItem("produtosDefinido", JSON.stringify(produtos));
-    }, [produtos]);
+        // A CADA ATUALIZAÇÃO DE PRODUTOS, VERIFICA SE ESTOUROU O ORÇAMENTO
+        const valorMaximo = parseFloat(valorPreDefinido.replace(',', '.')) || 0;
+        const totalGeral = calcularTotalCompra(produtos); // Passa 'produtos' atualizado
+        
+        if (totalGeral > valorMaximo && valorMaximo > 0) {
+            setAvisoEstouro(`⚠️ O valor total R$ ${totalGeral.toFixed(2)} EXCEDEU o orçamento de R$ ${valorMaximo.toFixed(2)}.`);
+        } else {
+            setAvisoEstouro('');
+        }
+
+    }, [produtos, valorPreDefinido]); // Depende de produtos E valorPreDefinido
+    
+    // Função auxiliar para calcular o total (agora pode receber o array como parâmetro)
+    const calcularTotalCompra = (prods = produtos) => prods.reduce((acc, produto) => acc + produto.total, 0);
+
 
     useEffect(() => {
         localStorage.setItem("valorPreDefinido", valorPreDefinido);
@@ -258,13 +273,22 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
         if (!isNaN(valorNumerico) && valorNumerico >= 0) {
             setValorPreDefinido(novoValor);
             setIsBudgetEditing(false);
+            // Recalcula o aviso de estouro ao definir um novo orçamento
+            const totalGeral = calcularTotalCompra();
+            if (totalGeral > valorNumerico && valorNumerico > 0) {
+                 setAvisoEstouro(`⚠️ O valor total R$ ${totalGeral.toFixed(2)} EXCEDEU o orçamento de R$ ${valorNumerico.toFixed(2)}.`);
+            } else {
+                 setAvisoEstouro('');
+            }
+
         } else {
             setErro('Por favor, insira um valor numérico positivo.');
             setTimeout(() => setErro(''), 3000);
         }
     };
 
-    const calcularTotalCompra = () => produtos.reduce((acc, produto) => acc + produto.total, 0);
+    // A função calcularTotalCompra já foi atualizada acima para aceitar um argumento
+    // const calcularTotalCompra = () => produtos.reduce((acc, produto) => acc + produto.total, 0);
 
     const calcularRestante = () => {
         const valorMaximo = parseFloat(valorPreDefinido.replace(',', '.')) || 0;
@@ -347,7 +371,7 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
             total: novoValor * novaQtd,
         };
 
-        // TERCEIRA VALIDAÇÃO: Orçamento
+        // TERCEIRA VALIDAÇÃO: Orçamento (AGORA APENAS AVISA, NÃO BLOQUEIA)
         const totalAtualSemEste = editandoIndex !== null 
             ? calcularTotalCompra() - produtos[editandoIndex].total 
             : calcularTotalCompra();
@@ -355,12 +379,9 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
         const novoTotalGeral = totalAtualSemEste + novoProduto.total;
         const valorMaximo = parseFloat(valorPreDefinido.replace(',', '.')) || 0;
 
-        if (novoTotalGeral > valorMaximo) {
-            setErro(`O valor total R$ ${novoTotalGeral.toFixed(2)} excede o orçamento de R$ ${valorMaximo.toFixed(2)}.`);
-            setTimeout(() => setErro(''), 5000);
-            return;
-        }
-
+        // 🛑 MUDANÇA AQUI: Removemos o 'return' e a lógica de erro do formulário.
+        // A lógica de aviso de estouro está no useEffect, que é executado após o setProdutos.
+        // No entanto, podemos definir o avisoEstouro (que é usado no corpo principal) aqui para ser mais imediato.
 
         if (editandoIndex !== null) {
             const produtosAtualizados = produtos.map((produto, index) =>
@@ -369,6 +390,14 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
             setProdutos(produtosAtualizados);
         } else {
             setProdutos([...produtos, novoProduto]);
+        }
+        
+        // Define o erro/aviso temporário (opcional, o useEffect fará a validação final)
+        if (valorMaximo > 0 && novoTotalGeral > valorMaximo) {
+            // Apenas para mostrar um aviso rápido no modal antes de fechar
+             setErro(`ATENÇÃO: Este produto fará o orçamento exceder em R$ ${(novoTotalGeral - valorMaximo).toFixed(2).replace('.', ',')}!`);
+             setTimeout(() => setErro(''), 5000); // Limpa o aviso após um tempo
+
         }
 
         handleCloseModal();
@@ -389,35 +418,13 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
         setProdutoSelecionadoIndex(index === produtoSelecionadoIndex ? null : index);
     };
 
-    const gerarPDF = () => {
-        const doc = new jsPDF();
-        doc.text("Relatório de Orçamento e Compras", 10, 10);
-        doc.text(`Orçamento Máximo: R$ ${parseFloat(valorPreDefinido).toFixed(2)}`, 10, 18);
-
-        const tableColumn = ["EAN", "Nome", "Valor Unitário", "Quantidade", "Total"];
-        const tableRows = produtos.map((p) => [
-            p.ean || "-",
-            p.nome,
-            `R$ ${p.valor.toFixed(2)}`,
-            p.quantidade,
-            `R$ ${p.total.toFixed(2)}`
-        ]);
-
-        doc.autoTable({ head: [tableColumn], body: tableRows, startY: 25 });
-        const totalCompra = calcularTotalCompra().toFixed(2);
-        const restante = calcularRestante().toFixed(2);
-        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 35; 
-
-        doc.text(`Total Gasto: R$ ${totalCompra}`, 10, finalY + 10);
-        doc.text(`Orçamento Restante: R$ ${restante}`, 10, finalY + 17);
-        doc.save('lista-compras-orcamento.pdf');
-    };
 
     // Estilos dinâmicos do progresso
     const valorMaximo = parseFloat(valorPreDefinido.replace(',', '.')) || 1; // Evita divisão por zero
     const totalGasto = calcularTotalCompra();
     const percentual = Math.min((totalGasto / valorMaximo) * 100, 100);
-    const corProgresso = percentual >= 90 ? 'bg-red-500' : percentual >= 70 ? 'bg-yellow-500' : 'bg-green-500';
+    // CORRIGIDO: Use uma cor mais forte se o totalGasto for MAIOR que o valorMaximo (estouro)
+    const corProgresso = totalGasto > valorMaximo ? 'bg-red-700' : percentual >= 90 ? 'bg-red-500' : percentual >= 70 ? 'bg-yellow-500' : 'bg-green-500';
 
     return (
         <div className={`min-h-screen p-6 relative flex flex-col ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
@@ -427,14 +434,21 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
             </button>
 
             <div className="container mx-auto max-w-4xl pt-8 flex-grow">
-                <h1 className="py-4 text-center text-4xl font-extrabold">Gerenciador de Orçamento 💰</h1>
+                <h1 className="py-4 sticky  text-center text-4xl font-extrabold">Gerenciador de Orçamento 💰</h1>
 
+                {/* Bloco de Aviso de Estouro - Visível no corpo principal */}
+                {avisoEstouro && (
+                    <div className="p-3 mb-4 text-center rounded-lg bg-red-100 border border-red-400 text-red-800 dark:bg-red-900/50 dark:border-red-600 dark:text-red-400 font-semibold shadow-md">
+                        {avisoEstouro}
+                    </div>
+                )}
+                
                 {/* ----------------------------------------------------------------- */}
                 {/* ORÇAMENTO MÁXIMO (Budget Block) */}
                 {/* ----------------------------------------------------------------- */}
                 <div className={`p-4 mb-6 rounded-xl shadow-xl ${modoNoturno ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}>
                     <div className="flex justify-between items-start">
-                        <h2 className="text-xl font-bold mb-2">Orçamento Máximo Definido</h2>
+                        <h2 className="text-lg font-bold mb-2">Orçamento Máximo Definido</h2>
                         <button 
                             onClick={() => setIsBudgetEditing(true)} 
                             className={`p-2 rounded-full transition ${modoNoturno ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
@@ -461,7 +475,7 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                             </button>
                         </div>
                     ) : (
-                        <p className="text-3xl font-extrabold text-blue-500 mt-1">
+                        <p className="text-xl font-extrabold text-blue-500 mt-1">
                             R$ {parseFloat(valorPreDefinido).toFixed(2).replace('.', ',')}
                         </p>
                     )}
@@ -474,8 +488,9 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                                 <span>Gasto Atual:</span>
                                 <span className="text-green-500">R$ {calcularTotalCompra().toFixed(2).replace('.', ',')}</span>
                             </div>
-                            <div className="flex justify-between font-bold text-xl mt-1">
+                            <div className="flex justify-between font-bold text-lg mt-1">
                                 <span>Restante:</span>
+                                {/* Destaque se o restante for negativo */}
                                 <span className={calcularRestante() < 0 ? 'text-red-500' : 'text-blue-500'}>
                                     R$ {calcularRestante().toFixed(2).replace('.', ',')}
                                 </span>
@@ -483,10 +498,10 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                             
                             {/* Barra de Progresso */}
                             <div className="w-full bg-gray-200 rounded-full h-3 mt-3 dark:bg-gray-700">
-                                <div className={`${corProgresso} h-3 rounded-full transition-all duration-500`} style={{ width: `${percentual}%` }}></div>
+                                <div className={`${corProgresso} h-3 rounded-full transition-all duration-500`} style={{ width: `${Math.min(percentual, 100)}%` }}></div>
                             </div>
                             <p className="text-sm text-right mt-1 text-gray-500 dark:text-gray-400">
-                                {percentual.toFixed(1)}% do orçamento gasto.
+                                {totalGasto > valorMaximo ? `ESTOUROU! ${((totalGasto/valorMaximo) * 100).toFixed(1)}% do orçamento.` : `${percentual.toFixed(1)}% do orçamento gasto.`}
                             </p>
                         </div>
                     )}
@@ -522,7 +537,7 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                                             <div className="grid grid-cols-3 gap-y-1 gap-x-4 text-sm">
                                                 <div className="flex flex-col">
                                                     <span className="font-semibold text-gray-400">Valor Und.:</span>
-                                                    <span className="font-medium">R$ {produto.valor.toFixed(2)}</span>
+                                                    <span className="font-medium">R$ {produto.valor.toFixed(2).replace('.', ',')}</span>
                                                 </div>
                                                 <div className="flex flex-col text-center">
                                                     <span className="font-semibold text-gray-400">Qtd.:</span>
@@ -530,7 +545,7 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                                                 </div>
                                                 <div className="flex flex-col items-end">
                                                     <span className="font-semibold text-gray-400">Total Item:</span>
-                                                    <span className="text-lg font-bold text-green-500">R$ {produto.total.toFixed(2)}</span>
+                                                    <span className="text-lg font-bold text-green-500">R$ {produto.total.toFixed(2).replace('.', ',')}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -538,9 +553,9 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                                         {/* Desktop layout */}
                                         <div className="hidden sm:flex w-full">
                                             <div className={`px-4 py-3 text-left flex items-center ${COL_NOME}`}>{produto.nome}</div>
-                                            <div className={`px-4 py-3 text-right flex items-center justify-end ${COL_VALOR}`}>R$ {produto.valor.toFixed(2)}</div>
+                                            <div className={`px-4 py-3 text-right flex items-center justify-end ${COL_VALOR}`}>R$ {produto.valor.toFixed(2).replace('.', ',')}</div>
                                             <div className={`px-4 py-3 text-center flex items-center justify-center ${COL_QTD}`}>{produto.quantidade}</div>
-                                            <div className={`px-4 py-3 font-semibold text-right flex items-center justify-end ${COL_TOTAL} text-lg text-green-600 dark:text-green-400`}>R$ {produto.total.toFixed(2)}</div>
+                                            <div className={`px-4 py-3 font-semibold text-right flex items-center justify-end ${COL_TOTAL} text-lg text-green-600 dark:text-green-400`}>R$ {produto.total.toFixed(2).replace('.', ',')}</div>
                                         </div>
 
                                         {/* Ações (Editar/Excluir) */}
@@ -569,11 +584,6 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
 
                     {produtos.length > 0 && (
                         <div className="flex justify-between items-center border-t-4 border-green-500 font-bold p-4 mt-2">
-                            <button 
-                                onClick={gerarPDF} 
-                                className="bg-gray-500 text-white px-3 py-1 rounded-lg hover:bg-gray-600 transition font-semibold text-sm">
-                                Exportar PDF 📄
-                            </button>
                             <span className="text-2xl text-green-600 dark:text-green-400">
                                 Total: R$ {calcularTotalCompra().toFixed(2).replace('.', ',')}
                             </span>

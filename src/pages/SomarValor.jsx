@@ -253,11 +253,11 @@ const SomarValor = ({ onGoHome }) => {
       </button>
 
       <div className="container mx-auto max-w-4xl pt-8 flex-grow">
-        <h1 className="py-4 text-center text-4xl font-extrabold">Sua Lista de Compras 🛒</h1>
+        <h1 className="py-4 p-8 text-center text-4xl font-extrabold">Sua Lista de Compras 🛒</h1>
 
         {/* Lista de produtos */}
         <div className={`p-4 mt-4 rounded-xl shadow-lg border ${modoNoturno ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-          <div className="overflow-y-scroll max-h-96">
+          <div className="overflow-y-scroll min-h-44 max-h-96">
             {produtos.length === 0 ? (
               <div className="text-center py-10">
                 <p className="font-semibold text-lg mb-2">Sua lista de compras está vazia. 📝</p>

@@ -55,7 +55,7 @@ const SidebarMenu = ({
     fixed top-0 left-0 
     ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
     
-    md:relative md:translate-x-0 md:block 
+    md:relative md:translate-x-0 md:block md:flex
   `;
 
   return (

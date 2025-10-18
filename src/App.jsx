@@ -12,8 +12,8 @@ const USER_STORAGE_KEY = 'somarvalor_user_auth';
 
 // MOCK DE USUÁRIOS: Armazena o objeto completo para passar aos componentes
 const MOCK_USERS = {
-'usuario': { role: 'usuario', email: 'usuario@sistema.com', name: 'Usuário Comum' },
-'admin': { role: 'admin', email: 'admin@sistema.com', name: 'Administrador' },
+'usuario': { role: 'usuario', email: 'usuario@app.com', name: 'Usuário Comum' },
+'admin': { role: 'admin', email: 'admin@app.com', name: 'Administrador' },
 };
 
 const AppContent = () => {

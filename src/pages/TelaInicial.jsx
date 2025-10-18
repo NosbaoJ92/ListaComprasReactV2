@@ -13,7 +13,7 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
  // --- 🔑 AJUSTE: LENDO DADOS DO OBJETO usuarioLogado ---
  // Define isAdmin baseado na 'role' do objeto. Se o objeto for null (o que não deve acontecer aqui), assume-se 'usuario'.
  const isAdmin = usuarioLogado?.role === 'admin';
- const userEmail = usuarioLogado?.email || 'usuario@sistema.com';
+ const userEmail = usuarioLogado?.email || 'usuario@app.com';
  const userName = usuarioLogado?.name || (isAdmin ? "Admin Mestre" : "Usuário Comum");
 
  // --- Estados de Lógica de Tela ---
@@ -204,7 +204,7 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
         ☰
       </button>
       <h1 className="text-xl font-bold">
-        {globalMenuOptions.find(item => item.id === currentPage)?.label || 'Sistema'}
+        {globalMenuOptions.find(item => item.id === currentPage)?.label || ' '}
       </h1>
       <div className="w-8"></div>
     </header>

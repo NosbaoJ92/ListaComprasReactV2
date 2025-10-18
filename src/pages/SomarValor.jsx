@@ -329,23 +329,29 @@ const SomarValor = ({ onGoHome, usuarioLogado, onLogoutSuccess, onToggleModoNotu
 	// RENDERIZAÇÃO
 	// -------------------------------------------------------------
 	return (
-		<div className={`min-h-screen pt-12 p-6 relative flex flex-col ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
-            {isMenuOpen && (
-                <div 
-                    className="fixed inset-0 bg-black opacity-50 z-30 md:hidden"
-                    onClick={closeMenu}
-                />
-            )}
+		<div className={`min-h-screen w-full flex ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
+			 
+			{/* Overlay de fundo para mobile quando o menu está aberto */}
+			{isMenuOpen && (
+				<div 
+					className="fixed inset-0 bg-black opacity-50 z-30 md:hidden"
+					onClick={closeMenu}
+				/>
+			)}
 
-            {/* 1. Menu Lateral (SidebarMenu) */}
-            <SidebarMenu
-                menuItems={globalMenuOptions} // Lista FILTRADA
-                accountInfo={userAccountInfo} // Infos da Conta (inclui isAdmin e onLogout)
-                activeLink={currentPage} // Estado declarado
-                onNavigate={handleNavigation}
-                isMenuOpen={isMenuOpen} // Estado declarado
-                onClose={closeMenu} 
-            />
+			{/* 1. Menu Lateral (SidebarMenu) */}
+			<SidebarMenu
+				menuItems={globalMenuOptions} // Lista FILTRADA
+				accountInfo={userAccountInfo} // Infos da Conta (inclui isAdmin e onLogout)
+				activeLink={currentPage}
+				onNavigate={handleNavigation}
+				isMenuOpen={isMenuOpen} 
+				onClose={closeMenu} 
+			/>
+
+
+			{/* 2. Conteúdo Principal */}
+			<main className="flex-grow p-4 sm:p-8 overflow-y-auto">
 				 
 				{/* Header/Barra para Mobile com Botão de Menu (Substitui os botões fixos de Home e Tema) */}
 				<header className="flex items-center justify-between mb-8 md:hidden">
@@ -446,9 +452,9 @@ const SomarValor = ({ onGoHome, usuarioLogado, onLogoutSuccess, onToggleModoNotu
 						<button onClick={() => { setIsOpen(true); setEditandoIndex(null); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold">
 							+ Adicionar Novo Produto
 						</button>
-						<button onClick={gerarPDF} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-semibold">
+						{/* <button onClick={gerarPDF} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-semibold">
 							Gerar Relatório PDF
-						</button>
+						</button> */}
 					</div>
 				 
 				</div> {/* FECHAMENTO DO CONTAINER .mx-auto max-w-4xl */}
@@ -619,6 +625,7 @@ const SomarValor = ({ onGoHome, usuarioLogado, onLogoutSuccess, onToggleModoNotu
 						</div>
 					</div>
 				)} 
+			</main>
 		</div>
 	);
 };

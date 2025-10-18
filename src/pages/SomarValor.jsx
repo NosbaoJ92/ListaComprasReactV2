@@ -442,7 +442,7 @@ const SomarValor = ({ onGoHome, usuarioLogado, onLogoutSuccess, onToggleModoNotu
 					</div>
 
 					{produtos.length > 0 && (
-						<div className="border-t-4 border-green-500 font-bold p-4 text-right text-2xl text-green-600 dark:text-green-400">
+						<div className="border-t-4 mt-4 border-green-500 font-bold p-4 text-right text-2xl text-green-600 dark:text-green-400">
 							Total: R$ {calcularTotalCompra().toFixed(2)}
 						</div>
 					)}
@@ -452,12 +452,14 @@ const SomarValor = ({ onGoHome, usuarioLogado, onLogoutSuccess, onToggleModoNotu
 						<button onClick={() => { setIsOpen(true); setEditandoIndex(null); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold">
 							+ Adicionar Novo Produto
 						</button>
+
 						{/* <button onClick={gerarPDF} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-semibold">
 							Gerar Relatório PDF
 						</button> */}
+
 					</div>
 				 
-				</div> {/* FECHAMENTO DO CONTAINER .mx-auto max-w-4xl */}
+				</div>
 
 				{/* Modal (DEVE FICAR FORA DO CONTAINER DE CONTEÚDO PARA FUNCIONAR COMO OVERLAY) */}
 				{isOpen && (

@@ -110,14 +110,14 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
       <div className={`sticky top-0 h-4 z-10 w-full pointer-events-none ${modoNoturno ? 'bg-gradient-to-b from-gray-900' : 'bg-gradient-to-b from-gray-100'}`}></div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-4">
-        <label className={cardClasses('lista')}>
+        {/* <label className={cardClasses('lista')}>
           <input type="radio" value="lista" checked={option === 'lista'} onChange={handleMainOptionChange} className="hidden"/>
           <div className="flex flex-col items-center cursor-pointer">
             <span className="w-10 h-10 mb-2 flex items-center justify-center text-blue-500 font-bold text-3xl">📝</span>
             <p className="font-semibold text-xl">Criar Lista</p>
             <p className="text-center text-sm mt-1 opacity-75 text-xs">Planeje suas compras antes de ir ao mercado.</p>
           </div>
-        </label>
+        </label> */}
 
         <label className={cardClasses('somar')}>
           <input type="radio" value="somar" checked={option === 'somar'} onChange={handleMainOptionChange} className="hidden"/>

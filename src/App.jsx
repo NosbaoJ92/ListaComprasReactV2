@@ -4,150 +4,173 @@ import SomarValor from './pages/SomarValor';
 import ValorDefinido from './pages/ValorDefinido';
 import ValorMaximo from './pages/ValorMaximo';
 import GestorEAN from './pages/GestorEAN';
+import ListaPlan from './pages/ListaPlan'; // Importação da nova tela
 import Login from './pages/Login';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 
-// Chave para armazenar o objeto de usuário no localStorage
+// Chaves para o localStorage
 const USER_STORAGE_KEY = 'somarvalor_user_auth';
+const LIST_STORAGE_KEY = 'somarvalor_lista_itens';
 
-// MOCK DE USUÁRIOS: Armazena o objeto completo para passar aos componentes
+// MOCK DE USUÁRIOS
 const MOCK_USERS = {
-'usuario': { role: 'usuario', email: 'usuario@app.com', name: 'Usuário Comum' },
-'admin': { role: 'admin', email: 'admin@app.com', name: 'Administrador' },
+  'usuario': { role: 'usuario', email: 'usuario@app.com', name: 'Usuário Comum' },
+  'admin': { role: 'admin', email: 'admin@app.com', name: 'Administrador' },
 };
 
 const AppContent = () => {
-// 🔑 AJUSTE 1: Inicializa o estado lendo do localStorage, se houver.
-const [usuarioLogado, setUsuarioLogado] = useState(() => {
- const savedUser = localStorage.getItem(USER_STORAGE_KEY);
- try {
-  return savedUser ? JSON.parse(savedUser) : null;
- } catch (e) {
-  console.error("Erro ao parsear usuário do localStorage:", e);
-  return null;
- }
-});
+  // 1. ESTADO DE AUTENTICAÇÃO
+  const [usuarioLogado, setUsuarioLogado] = useState(() => {
+    const savedUser = localStorage.getItem(USER_STORAGE_KEY);
+    try {
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (e) {
+      return null;
+    }
+  });
 
-const [option, setOption] = useState('');
-const [subOption, setSubOption] = useState('');
-const { modoNoturno, toggleModoNoturno } = useTheme();
+  // 2. ESTADO DA LISTA DE COMPRAS (Compartilhado entre as telas)
+  const [items, setItems] = useState(() => {
+    const savedItems = localStorage.getItem(LIST_STORAGE_KEY);
+    try {
+      return savedItems ? JSON.parse(savedItems) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
-// 🔑 AJUSTE 2: Efeito para PERSISTIR o estado de login no localStorage.
-useEffect(() => {
- if (usuarioLogado) {
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(usuarioLogado));
- } else {
-  localStorage.removeItem(USER_STORAGE_KEY);
- }
-}, [usuarioLogado]);
+  // 3. ESTADO DE NAVEGAÇÃO
+  const [option, setOption] = useState('');
+  const [subOption, setSubOption] = useState('');
 
+  // 4. TEMA (Modo Noturno)
+  const { modoNoturno, toggleModoNoturno } = useTheme();
 
-const handleAutenticacaoSucesso = (role) => {
- const userObject = MOCK_USERS[role];
- if (userObject) {
-  console.log('Usuário autenticado:', userObject);
-  setUsuarioLogado(userObject); // O useEffect se encarrega de salvar no localStorage
- } else {
-  console.error('Role desconhecida:', role);
- }
-};
+  // Efeito para persistir usuário
+  useEffect(() => {
+    if (usuarioLogado) {
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(usuarioLogado));
+    } else {
+      localStorage.removeItem(USER_STORAGE_KEY);
+    }
+  }, [usuarioLogado]);
 
-const handleSelectOption = (selectedOption, selectedSubOption) => {
- setOption(selectedOption);
- setSubOption(selectedSubOption);
-};
+  // Efeito para persistir a lista de compras
+  useEffect(() => {
+    localStorage.setItem(LIST_STORAGE_KEY, JSON.stringify(items));
+  }, [items]);
 
-const handleGoHome = () => {
- setOption('');
- setSubOption('');
-};
+  // FUNÇÕES DE MANIPULAÇÃO
+  const handleAutenticacaoSucesso = (role) => {
+    const userObject = MOCK_USERS[role];
+    if (userObject) setUsuarioLogado(userObject);
+  };
 
-// Função de Logout: limpa o estado de autenticação e o localStorage
-const handleLogout = () => {
- setUsuarioLogado(null); // O useEffect remove do localStorage
- setOption('');
- setSubOption('');
-};
+  const handleSelectOption = (selectedOption, selectedSubOption) => {
+    setOption(selectedOption);
+    setSubOption(selectedSubOption);
+  };
 
-// ==============================================================
-// Renderização condicional: Login → Conteúdo principal
-// ==============================================================
-if (!usuarioLogado) {
- return (
-  <div className={`h-dvh w-dvw transition-colors duration-500 ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
-   <Login onAutenticacaoSucesso={handleAutenticacaoSucesso} />
-  </div>
- );
-}
+  const handleGoHome = () => {
+    setOption('');
+    setSubOption('');
+  };
 
-// ==============================================================
-// Conteúdo principal após login
-// ==============================================================
-return (
- <div className={`h-dvh w-dvw relative transition-colors duration-500 ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
-  {option === '' && (
-   <TelaInicial 
-    onSelectOption={handleSelectOption} 
-    modoNoturno={modoNoturno} 
-    onToggleModoNoturno={toggleModoNoturno}
-    
-    // Passa o objeto completo do usuário
-    usuarioLogado={usuarioLogado}
-    
-    // Passa a função de logout
-    onLogoutSuccess={handleLogout}
-   />
-  )}
+  const handleLogout = () => {
+    setUsuarioLogado(null);
+    handleGoHome();
+  };
 
-  {/* 🔑 AJUSTE 3: Passa as props de login/logout para o SomarValor */}
-  {option === 'somar' && (
-   <SomarValor 
-    onGoHome={handleGoHome}
-    modoNoturno={modoNoturno} 
-    onToggleModoNoturno={toggleModoNoturno}
-    usuarioLogado={usuarioLogado} // <-- NOVO: Informação de quem está logado
-    onLogoutSuccess={handleLogout} // <-- NOVO: Função para deslogar
-   />
-  )}
+  // RENDERIZAÇÃO CONDICIONAL: LOGIN
+  if (!usuarioLogado) {
+    return (
+      <div className={`h-dvh w-dvw transition-colors duration-500 ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
+        <Login onAutenticacaoSucesso={handleAutenticacaoSucesso} />
+      </div>
+    );
+  }
 
-  {/* 🔑 AJUSTE 4: Repassar as props de usuário/logout para os demais componentes internos que as utilizam */}
-  {option === 'estipular' && subOption === 'subtrair' && (
-   <ValorDefinido 
-    onGoHome={handleGoHome} 
-    modoNoturno={modoNoturno} 
-    onToggleModoNoturno={toggleModoNoturno}
-    usuarioLogado={usuarioLogado} // <-- Recomendado
-    onLogoutSuccess={handleLogout} // <-- Recomendado
-   />
-  )}
+  // CONTEÚDO PRINCIPAL
+  return (
+    <div className={`h-dvh w-dvw relative transition-colors duration-500 ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
+      
+      {/* TELA INICIAL */}
+      {option === '' && (
+        <TelaInicial 
+          onSelectOption={handleSelectOption} 
+          modoNoturno={modoNoturno} 
+          onToggleModoNoturno={toggleModoNoturno}
+          usuarioLogado={usuarioLogado}
+          onLogoutSuccess={handleLogout}
+        />
+      )}
 
-  {option === 'estipular' && subOption === 'maximo' && (
-   <ValorMaximo 
-    onGoHome={handleGoHome}
-    modoNoturno={modoNoturno} 
-    onToggleModoNoturno={toggleModoNoturno}
-    usuarioLogado={usuarioLogado} // <-- Recomendado
-    onLogoutSuccess={handleLogout} // <-- Recomendado
-   />
-  )}
+      {/* TELA: PLANEJAR LISTA */}
+      {option === 'lista' && (
+        <ListaPlan 
+          items={items}
+          setItems={setItems}
+          onGoHome={handleGoHome}
+          modoNoturno={modoNoturno} 
+          usuarioLogado={usuarioLogado}
+        />
+      )}
 
-  {option === 'gestor' && (
-   <GestorEAN
-    onGoHome={handleGoHome}
-    modoNoturno={modoNoturno} 
-    onToggleModoNoturno={toggleModoNoturno}
-    usuarioLogado={usuarioLogado}
-    onLogoutSuccess={handleLogout}
-   />
-  )}
- </div>
-);
+      {/* TELA: SOMAR VALOR */}
+      {option === 'somar' && (
+        <SomarValor 
+        onGoHome={handleGoHome}
+        modoNoturno={modoNoturno} 
+        onToggleModoNoturno={toggleModoNoturno}
+        usuarioLogado={usuarioLogado}
+        onLogoutSuccess={handleLogout}
+        // Adicione ou verifique estas duas props:
+        items={items} 
+        setItems={setItems}
+        />
+      )}
+
+      {/* TELA: ESTIPULAR VALOR (SUBTRAIR) */}
+      {option === 'estipular' && subOption === 'subtrair' && (
+        <ValorDefinido 
+          onGoHome={handleGoHome} 
+          modoNoturno={modoNoturno} 
+          onToggleModoNoturno={toggleModoNoturno}
+          usuarioLogado={usuarioLogado}
+          onLogoutSuccess={handleLogout}
+        />
+      )}
+
+      {/* TELA: ESTIPULAR VALOR (MÁXIMO) */}
+      {option === 'estipular' && subOption === 'maximo' && (
+        <ValorMaximo 
+          onGoHome={handleGoHome}
+          modoNoturno={modoNoturno} 
+          onToggleModoNoturno={toggleModoNoturno}
+          usuarioLogado={usuarioLogado}
+          onLogoutSuccess={handleLogout}
+        />
+      )}
+
+      {/* TELA: GESTOR EAN */}
+      {option === 'gestor' && (
+        <GestorEAN
+          onGoHome={handleGoHome}
+          modoNoturno={modoNoturno} 
+          onToggleModoNoturno={toggleModoNoturno}
+          usuarioLogado={usuarioLogado}
+          onLogoutSuccess={handleLogout}
+        />
+      )}
+
+    </div>
+  );
 };
 
 const App = () => (
-<ThemeProvider>
- <AppContent />
-</ThemeProvider>
+  <ThemeProvider>
+    <AppContent />
+  </ThemeProvider>
 );
 
 export default App;

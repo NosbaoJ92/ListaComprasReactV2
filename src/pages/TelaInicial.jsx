@@ -43,7 +43,7 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
  const baseMenuOptions = [
   { id: 'home', icon: '🏠', type: 'link', description: 'Voltar para a seleção de modo' },
   { id: 'gestor', icon: '📦', type: 'link', description: 'Gerenciar códigos de barras' },
-  { id: 'settings', icon: '⚙️', type: 'link', description: 'Ajustes do sistema' },
+  // { id: 'settings', icon: '⚙️', type: 'link', description: 'Ajustes do sistema' },
   { id: 'themeToggle', icon: '🌙', type: 'toggleTheme', description: `Tema: ${modoNoturno ? 'Escuro' : 'Claro'}` },
  ];
 
@@ -127,24 +127,39 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
  const renderHomeContent = () => (
   <div className="w-full max-w-xl mx-auto">
    <h1 className="py-4 text-center text-4xl font-extrabold mb-10">Bem-vindo à Lista de Compras - Online</h1>
-   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-    <label className={cardClasses('somar')}>
-     <input type="radio" value="somar" checked={option === 'somar'} onChange={handleMainOptionChange} className="hidden"/>
-     <div className="flex flex-col items-center cursor-pointer">
-      <span className="w-8 h-8 mb-2 flex items-center justify-center text-blue-500 font-bold text-2xl">∑</span>
-      <p className="font-semibold text-xl">Somar Valores</p>
-      <p className="text-center text-sm mt-1 opacity-75">Acompanhe o total gasto em tempo real.</p>
-     </div>
-    </label>
-    <label className={cardClasses('estipular')}>
-     <input type="radio" value="estipular" checked={option === 'estipular'} onChange={handleMainOptionChange} className="hidden"/>
-     <div className="flex flex-col items-center cursor-pointer">
-      <span className="w-8 h-8 mb-2 flex items-center justify-center text-blue-500 font-bold text-2xl">$</span>
-      <p className="font-semibold text-xl">Estipular Valor</p>
-      <p className="text-center text-sm mt-1 opacity-75">Defina um limite de orçamento ou um valor inicial.</p>
-     </div>
-    </label>
-   </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+
+      {/* OPÇÃO 1: LISTA */}
+      <label className={cardClasses('lista')}>
+        <input type="radio" value="lista" checked={option === 'lista'} onChange={handleMainOptionChange} className="hidden"/>
+        <div className="flex flex-col items-center cursor-pointer">
+          <span className="w-10 h-10 mb-2 flex items-center justify-center text-blue-500 font-bold text-3xl">📝</span>
+          <p className="font-semibold text-xl">Criar Lista</p>
+          <p className="text-center text-sm mt-1 opacity-75">Planeje suas compras antes de ir ao mercado.</p>
+        </div>
+      </label>
+
+      {/* OPÇÃO 2: SOMAR */}
+      <label className={cardClasses('somar')}>
+        <input type="radio" value="somar" checked={option === 'somar'} onChange={handleMainOptionChange} className="hidden"/>
+        <div className="flex flex-col items-center cursor-pointer">
+          <span className="w-8 h-8 mb-2 flex items-center justify-center text-blue-500 font-bold text-2xl">∑</span>
+          <p className="font-semibold text-xl">Somar Valores</p>
+          <p className="text-center text-sm mt-1 opacity-75">Acompanhe o total gasto em tempo real.</p>
+        </div>
+      </label>
+
+      {/* OPÇÃO 3: ESTIPULAR */}
+      <label className={cardClasses('estipular')}>
+      <input type="radio" value="estipular" checked={option === 'estipular'} onChange={handleMainOptionChange} className="hidden"/>
+      <div className="flex flex-col items-center cursor-pointer">
+        <span className="w-8 h-8 mb-2 flex items-center justify-center text-blue-500 font-bold text-2xl">$</span>
+        <p className="font-semibold text-xl">Estipular Valor</p>
+        <p className="text-center text-sm mt-1 opacity-75">Defina um limite de orçamento ou um valor inicial.</p>
+      </div>
+      </label>
+    </div>
+    {/* OPÇÕES ESTIPULAR */}
    {option === 'estipular' && (
     <div className={`p-6 rounded-xl shadow-inner mb-8 ${modoNoturno ? 'bg-gray-700' : 'bg-gray-50'}`}>
      <h3 className="font-bold text-lg mb-4 text-center">Selecione o tipo de Estipulação:</h3>
@@ -212,7 +227,7 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
     {/* Renderiza o conteúdo da página ativa */}
     <div className="mt-4 md:mt-0"> 
       {currentPage === 'home' && renderHomeContent()}
-      {currentPage === 'settings' && <div className="text-center mt-16"><h1>Tela de Configurações (em construção)</h1></div>}
+      {/* {currentPage === 'settings' && <div className="text-center mt-16"><h1>Tela de Configurações (em construção)</h1></div>} */}
       
       {/* Validação de Renderização da Tela Gestor */}
       {currentPage === 'gestor' && (

@@ -17,33 +17,47 @@ const COL_TOTAL = "w-1/5";
  * @param {function(string, string): void} onSelectOption - Função para navegar para a tela de funcionalidade (App.jsx).
  * @param {function(): void} onLogoutSuccess - A função de logout REAL, passada pelo App.jsx.
  */
-const SomarValor = ({ onGoHome, usuarioLogado, onLogoutSuccess, onToggleModoNoturno }) => {
+const SomarValor = ({items , onGoHome,  usuarioLogado, onLogoutSuccess, onToggleModoNoturno }) => {
 
  const isAdmin = usuarioLogado?.role === 'admin';
  const userEmail = usuarioLogado?.email || 'usuario@sistema.com';
  const userName = usuarioLogado?.name || (isAdmin ? "Admin" : "Usuário Comum");
 
-	const { modoNoturno, toggleModoNoturno } = useTheme(); // Pega o tema do Contexto
+ const [exibirModalConfirmacao, setExibirModalConfirmacao] = useState(false);
 
-	const [ean, setEan] = useState("");
-	const [nomeProduto, setNomeProduto] = useState("");
-	const [valorProduto, setValorProduto] = useState("");
-	const [quantidadeProduto, setQuantidadeProduto] = useState("");
-	const [erro, setErro] = useState("");
-	const [editandoIndex, setEditandoIndex] = useState(null);
-	const [produtos, setProdutos] = useState([]);
-	const [isOpen, setIsOpen] = useState(false);
-	const [produtoSelecionadoIndex, setProdutoSelecionadoIndex] = useState(null);
+const { modoNoturno, toggleModoNoturno } = useTheme(); // Pega o tema do Contexto
 
-	const [currentPage, setCurrentPage] = useState('somar');
-	const [isMenuOpen, setIsMenuOpen] = useState(false);
+const [ean, setEan] = useState("");
+const [nomeProduto, setNomeProduto] = useState("");
+const [valorProduto, setValorProduto] = useState("");
+const [quantidadeProduto, setQuantidadeProduto] = useState("");
+const [erro, setErro] = useState("");
+const [editandoIndex, setEditandoIndex] = useState(null);
+const [produtos, setProdutos] = useState([]);
+const [isOpen, setIsOpen] = useState(false);
+const [produtoSelecionadoIndex, setProdutoSelecionadoIndex] = useState(null);
 
-	// Estados do Scanner
-	const [leitorAtivo, setLeitorAtivo] = useState(false);
-	const codeReaderRef = useRef(null);
+const [currentPage, setCurrentPage] = useState('somar');
+const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-	const closeMenu = () => setIsMenuOpen(false);
-	const toggleMenu = () => setIsMenuOpen(prev => !prev);
+// Estados do Scanner
+const [leitorAtivo, setLeitorAtivo] = useState(false);
+const codeReaderRef = useRef(null);
+
+const closeMenu = () => setIsMenuOpen(false);
+const toggleMenu = () => setIsMenuOpen(prev => !prev);
+
+const handleLimparLista = () => {
+    if (produtos.length === 0) return;
+    setExibirModalConfirmacao(true); // Abre o modal
+};
+
+const confirmarLimpeza = () => {
+    setProdutos([]);
+    setProdutoSelecionadoIndex(null);
+    localStorage.removeItem("produtos");
+    setExibirModalConfirmacao(false); // Fecha o modal
+};
 	
 	// --- Funções de Logout ---
  const handleLogout = () => {
@@ -56,40 +70,38 @@ const SomarValor = ({ onGoHome, usuarioLogado, onLogoutSuccess, onToggleModoNotu
  };
 	
 	const handleNavigation = (pageId) => {
-		closeMenu();
-		if (pageId === 'home') {
-			onGoHome();
-			return;
-		}
-		
-		if (pageId === 'themeToggle') {
-			if (onToggleModoNoturno) {
-				onToggleModoNoturno();
-			} else {
-				toggleModoNoturno(); 
-			}
-			return;
-		}
-		
-		// Simulação de navegação para outras telas
-		if (pageId === 'gestor') {
-			if (!isAdmin) {
-				alert("Acesso negado: Você não tem permissão de administrador.");
-				return;
-			}
-			alert(`Navegação simulada para ${pageId}.`);
-		} else if (pageId === 'settings') {
-			alert(`Navegação simulada para ${pageId}.`);
-		}
-		 	
-		setCurrentPage(pageId); 
-	};
+  closeMenu();
+  
+  if (pageId === 'home') {
+    onGoHome();
+    return;
+  }
+
+  if (pageId === 'themeToggle') {
+    if (onToggleModoNoturno) {
+      onToggleModoNoturno();
+    } else {
+      toggleModoNoturno(); 
+    }
+    return;
+  }
+
+  if (pageId === 'gestor') {
+    if (!isAdmin) {
+      alert("Acesso negado: Você não tem permissão de administrador.");
+      return;
+    }
+  }
+
+  setCurrentPage(pageId); 
+};
+
 	
 	// Estrutura de Opções base
 	const baseMenuOptions = [
   { id: 'home', icon: '🏠', type: 'link', description: 'Voltar para a seleção de modo' },
   { id: 'gestor', icon: '📦', type: 'link', description: 'Gerenciar códigos de barras' },
-  { id: 'settings', icon: '⚙️', type: 'link', description: 'Ajustes do sistema' },
+//   { id: 'settings', icon: '⚙️', type: 'link', description: 'Ajustes do sistema' },
   { id: 'themeToggle', icon: '🌙', type: 'toggleTheme', description: `Tema: ${modoNoturno ? 'Escuro' : 'Claro'}` },
  ];
 
@@ -448,18 +460,59 @@ const SomarValor = ({ onGoHome, usuarioLogado, onLogoutSuccess, onToggleModoNotu
 					)}
 					
 					{/* BOTÕES DE CONTROLE - DENTRO DO CONTAINER PRINCIPAL */}
-					<div className="flex justify-between items-center w-full mt-4">
+					<div className="flex justify-between w-full mt-4">
 						<button onClick={() => { setIsOpen(true); setEditandoIndex(null); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold">
-							+ Adicionar Novo Produto
+							+ Adicionar Produto
 						</button>
 
 						{/* <button onClick={gerarPDF} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-semibold">
 							Gerar Relatório PDF
 						</button> */}
 
+						{/* Botão de Limpar Lista */}
+						{produtos.length > 0 && (
+							<button 
+								onClick={handleLimparLista} 
+								className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-semibold"
+							>
+								Limpar Lista
+							</button>
+						)}
 					</div>
-				 
 				</div>
+				{/* Modal de Confirmação */}
+				{exibirModalConfirmacao && (
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+						<div className={`w-full max-w-sm p-6 rounded-2xl shadow-2xl transform transition-all ${modoNoturno ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}`}>
+							<div className="text-center">
+								<div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+									<svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+									</svg>
+								</div>
+								<h3 className="text-xl font-bold mb-2">Apagar Lista?</h3>
+								<p className="text-sm opacity-80 mb-6">
+									Esta ação não pode ser desfeita. Todos os itens serão removidos permanentemente.
+								</p>
+							</div>
+
+							<div className="flex gap-3">
+								<button
+									onClick={confirmarLimpeza}
+									className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow-lg shadow-red-600/20 transition"
+								>
+									Sim, Apagar
+								</button>
+								<button
+									onClick={() => setExibirModalConfirmacao(false)}
+									className={`flex-1 py-3 px-4 rounded-xl font-semibold transition ${modoNoturno ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}
+								>
+									Cancelar
+								</button>
+							</div>
+						</div>
+					</div>
+				)}
 
 				{/* Modal (DEVE FICAR FORA DO CONTAINER DE CONTEÚDO PARA FUNCIONAR COMO OVERLAY) */}
 				{isOpen && (

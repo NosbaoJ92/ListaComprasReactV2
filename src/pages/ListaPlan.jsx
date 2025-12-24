@@ -19,10 +19,10 @@ const ListaPlan = ({
 
   // Configuração do Menu Lateral (Igual à Tela Inicial para manter consistência)
   const globalMenuOptions = [
-     { id: 'home', icon: '🏠', type: 'link', description: 'Voltar para a seleção de modo' },
-  { id: 'gestor', icon: '📦', type: 'link', description: 'Gerenciar códigos de barras' },
-//   { id: 'settings', icon: '⚙️', type: 'link', description: 'Ajustes do sistema' },
-  { id: 'themeToggle', icon: '🌙', type: 'toggleTheme', description: `Tema: ${modoNoturno ? 'Escuro' : 'Claro'}` },
+    { id: 'home', icon: '🏠', type: 'link', description: 'Voltar para a seleção de modo' },
+    { id: 'gestor', icon: '📦', type: 'link', description: 'Gerenciar códigos de barras' },
+    //   { id: 'settings', icon: '⚙️', type: 'link', description: 'Ajustes do sistema' },
+    { id: 'themeToggle', icon: '🌙', type: 'toggleTheme', description: `Tema: ${modoNoturno ? 'Escuro' : 'Claro'}` },
   ].filter(item => item.id !== 'gestor' || isAdmin);
 
   const userAccountInfo = {

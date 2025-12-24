@@ -19,11 +19,11 @@ const COL_TOTAL = "w-1/5";
  */
 const SomarValor = ({items , onGoHome,  usuarioLogado, onLogoutSuccess, onToggleModoNoturno }) => {
 
- const isAdmin = usuarioLogado?.role === 'admin';
- const userEmail = usuarioLogado?.email || 'usuario@sistema.com';
- const userName = usuarioLogado?.name || (isAdmin ? "Admin" : "Usuário Comum");
+const isAdmin = usuarioLogado?.role === 'admin';
+const userEmail = usuarioLogado?.email || 'usuario@sistema.com';
+const userName = usuarioLogado?.name || (isAdmin ? "Admin" : "Usuário Comum");
 
- const [exibirModalConfirmacao, setExibirModalConfirmacao] = useState(false);
+const [exibirModalConfirmacao, setExibirModalConfirmacao] = useState(false);
 
 const { modoNoturno, toggleModoNoturno } = useTheme(); // Pega o tema do Contexto
 

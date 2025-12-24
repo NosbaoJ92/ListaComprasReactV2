@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserMultiFormatReader, NotFoundException } from "@zxing/library";
+import SidebarMenu from '../components/SidebarMenu'; 
 
 // Definições de Largura OTIMIZADAS (para manter a consistência visual)
 const COL_NOME = "w-2/5"; // 40%
@@ -26,6 +27,8 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
     const [erro, setErro] = useState('');
     const [editandoIndex, setEditandoIndex] = useState(null);
     const [produtoSelecionadoIndex, setProdutoSelecionadoIndex] = useState(null);
+    //LIMPEZA DA LISTA
+    const [exibirModalConfirmacao, setExibirModalConfirmacao] = useState(false);
     
     // NOVO ESTADO para controlar o aviso de estouro de orçamento SEM BLOQUEAR a ação
     const [avisoEstouro, setAvisoEstouro] = useState(''); 
@@ -40,6 +43,19 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
     const codeReaderRef = useRef(null);
     // Embora decodeFromConstraints use o ID, manter o ref é bom para práticas de React
     const videoRef = useRef(null); 
+
+    //LIMPAR LISTA LÓGICA
+    const handleLimparLista = () => {
+    if (produtos.length === 0) return;
+    setExibirModalConfirmacao(true); // Abre o modal
+    };
+
+    const confirmarLimpeza = () => {
+        setProdutos([]);
+        setProdutoSelecionadoIndex(null);
+        localStorage.removeItem("produtos");
+        setExibirModalConfirmacao(false); // Fecha o modal
+    };
 
 
     // EFEITOS (Carregar/Salvar)
@@ -592,15 +608,63 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                 </div>
 
                 {/* Botão Adicionar e Gerar PDF (se houver produtos) */}
-                <div className="container mx-auto max-w-4xl flex justify-between items-center w-full mt-4">
-                    <button 
+                {/* BOTÕES DE CONTROLE - DENTRO DO CONTAINER PRINCIPAL */}
+					<div className="flex justify-between w-full mt-4">
+						<button 
                         onClick={() => handleOpenModal()} 
                         className={`bg-blue-600 text-white px-4 py-2 rounded-lg ${!valorPreDefinido ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700 transition'} font-semibold`}
                         disabled={!valorPreDefinido}
-                    >
-                        + Adicionar Produto
-                    </button>
-                </div>
+                        >
+                            + Adicionar Produto
+                        </button>
+
+						{/* <button onClick={gerarPDF} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-semibold">
+							Gerar Relatório PDF
+						</button> */}
+
+						{/* Botão de Limpar Lista */}
+						{produtos.length > 0 && (
+							<button 
+								onClick={handleLimparLista} 
+								className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-semibold"
+							>
+								Limpar Lista
+							</button>
+						)}
+					</div>
+                {/* Modal de Confirmação */}
+				{exibirModalConfirmacao && (
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+						<div className={`w-full max-w-sm p-6 rounded-2xl shadow-2xl transform transition-all ${modoNoturno ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}`}>
+							<div className="text-center">
+								<div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
+									<svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+									</svg>
+								</div>
+								<h3 className="text-xl font-bold mb-2">Apagar Lista?</h3>
+								<p className="text-sm opacity-80 mb-6">
+									Esta ação não pode ser desfeita. Todos os itens serão removidos permanentemente.
+								</p>
+							</div>
+
+							<div className="flex gap-3">
+								<button
+									onClick={confirmarLimpeza}
+									className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow-lg shadow-red-600/20 transition"
+								>
+									Sim, Apagar
+								</button>
+								<button
+									onClick={() => setExibirModalConfirmacao(false)}
+									className={`flex-1 py-3 px-4 rounded-xl font-semibold transition ${modoNoturno ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}
+								>
+									Cancelar
+								</button>
+							</div>
+						</div>
+					</div>
+				)}
 
                 {/* ----------------------------------------------------------------- */}
                 {/* MODAL DE PRODUTO */}

@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { BrowserMultiFormatReader, NotFoundException } from "@zxing/library";
-import SidebarMenu from '../components/SidebarMenu'; 
+import SidebarMenu from '../components/SidebarMenu';
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // Definições de Largura OTIMIZADAS (para manter a consistência visual)
 const COL_NOME = "w-2/5"; // 40%
@@ -27,6 +31,10 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
     const [erro, setErro] = useState('');
     const [editandoIndex, setEditandoIndex] = useState(null);
     const [produtoSelecionadoIndex, setProdutoSelecionadoIndex] = useState(null);
+
+    //EXPORTANDO EM EXCEL/PDF
+    const [modalExportarOpen, setModalExportarOpen] = useState(false);
+
     //LIMPEZA DA LISTA
     const [exibirModalConfirmacao, setExibirModalConfirmacao] = useState(false);
     
@@ -56,6 +64,90 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
         localStorage.removeItem("produtos");
         setExibirModalConfirmacao(false); // Fecha o modal
     };
+
+
+    //EXPORTAR EM EXCEL
+    const exportarExcel = () => {
+    if (produtos.length === 0) {
+        setErro("Não há produtos para exportar.");
+        setTimeout(() => setErro(""), 3000);
+        return;
+    }
+
+    const dados = produtos.map((produto) => ({
+        Produto: produto.nome,
+        "Valor Unitário": produto.valor,
+        Quantidade: produto.quantidade,
+        Total: produto.total,
+        EAN: produto.ean || "-"
+    }));
+
+    // Adiciona resumo final
+    dados.push({
+        Produto: "TOTAL GERAL",
+        "Valor Unitário": "",
+        Quantidade: "",
+        Total: calcularTotalCompra(),
+        EAN: ""
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dados);
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Relatório");
+
+    const excelBuffer = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array"
+    });
+
+    const data = new Blob(
+        [excelBuffer],
+        {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+    );
+
+    saveAs(data, "relatorio_compras.xlsx");
+};
+
+    //EXPORTAR EM PDF
+    const exportarPDF = () => {
+    if (produtos.length === 0) {
+        setErro("Não há produtos para exportar.");
+        setTimeout(() => setErro(""), 3000);
+        return;
+    }
+
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.text("Relatório de Compras", 14, 15);
+
+    const tableData = produtos.map((produto) => [
+        produto.nome,
+        `R$ ${produto.valor.toFixed(2)}`,
+        produto.quantidade,
+        `R$ ${produto.total.toFixed(2)}`,
+        produto.ean || "-"
+    ]);
+
+    autoTable(doc, {
+        head: [["Produto", "Valor Unit.", "Qtd", "Total", "EAN"]],
+        body: tableData,
+        startY: 25,
+    });
+
+    const finalY = doc.lastAutoTable.finalY || 30;
+
+    doc.text(
+        `TOTAL GERAL: R$ ${calcularTotalCompra().toFixed(2)}`,
+        14,
+        finalY + 10
+    );
+
+    doc.save("relatorio_compras.pdf");
+};
 
 
     // EFEITOS (Carregar/Salvar)
@@ -607,31 +699,38 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                     )}
                 </div>
 
-                {/* Botão Adicionar e Gerar PDF (se houver produtos) */}
                 {/* BOTÕES DE CONTROLE - DENTRO DO CONTAINER PRINCIPAL */}
-					<div className="flex justify-between w-full mt-4">
-						<button 
-                        onClick={() => handleOpenModal()} 
-                        className={`bg-blue-600 text-white px-4 py-2 rounded-lg ${!valorPreDefinido ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700 transition'} font-semibold`}
-                        disabled={!valorPreDefinido}
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4 w-full">
+                        <button
+                            onClick={() => handleOpenModal()}
+                            className={`w-full h-12 rounded-lg text-white font-semibold flex items-center justify-center ${
+                                !valorPreDefinido
+                                    ? 'bg-blue-400 opacity-50 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700 transition'
+                            }`}
+                            disabled={!valorPreDefinido}
                         >
                             + Adicionar Produto
                         </button>
 
-						{/* <button onClick={gerarPDF} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-semibold">
-							Gerar Relatório PDF
-						</button> */}
+                        {produtos.length > 0 && (
+                            <>
+                                <button
+                                    onClick={() => setModalExportarOpen(true)}
+                                    className="w-full h-12 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center"
+                                >
+                                    Exportar
+                                </button>
 
-						{/* Botão de Limpar Lista */}
-						{produtos.length > 0 && (
-							<button 
-								onClick={handleLimparLista} 
-								className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-semibold"
-							>
-								Limpar Lista
-							</button>
-						)}
-					</div>
+                                <button
+                                    onClick={handleLimparLista}
+                                    className="w-full h-12 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold flex items-center justify-center"
+                                >
+                                    Limpar Lista
+                                </button>
+                            </>
+                        )}
+                    </div>
                 {/* Modal de Confirmação */}
 				{exibirModalConfirmacao && (
 					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -665,6 +764,56 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
 						</div>
 					</div>
 				)}
+
+                {/* MODAL EXPORTAR */}
+                {modalExportarOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                        <div
+                            className={`w-full max-w-md p-6 rounded-2xl shadow-2xl ${
+                                modoNoturno
+                                    ? 'bg-gray-800 text-white'
+                                    : 'bg-white text-gray-800'
+                            }`}
+                        >
+                            <h2 className="text-xl font-bold text-center mb-6">
+                                Escolha o formato de exportação
+                            </h2>
+
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={() => {
+                                        exportarExcel();
+                                        setModalExportarOpen(false);
+                                    }}
+                                    className="w-full h-12 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold"
+                                >
+                                    Exportar em Excel
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        exportarPDF();
+                                        setModalExportarOpen(false);
+                                    }}
+                                    className="w-full h-12 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition font-semibold"
+                                >
+                                    Exportar em PDF
+                                </button>
+
+                                <button
+                                    onClick={() => setModalExportarOpen(false)}
+                                    className={`w-full h-12 rounded-xl font-semibold transition ${
+                                        modoNoturno
+                                            ? 'bg-gray-700 hover:bg-gray-600'
+                                            : 'bg-gray-100 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* ----------------------------------------------------------------- */}
                 {/* MODAL DE PRODUTO */}

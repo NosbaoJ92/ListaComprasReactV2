@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 import { useTheme } from '../components/ThemeContext'; 
 import { BrowserMultiFormatReader } from "@zxing/library";
 import SidebarMenu from '../components/SidebarMenu'; 
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const COL_NOME = "w-2/5";
 const COL_VALOR = "w-1/5";
@@ -22,6 +24,9 @@ const SomarValor = ({items , onGoHome,  usuarioLogado, onLogoutSuccess, onToggle
 const isAdmin = usuarioLogado?.role === 'admin';
 const userEmail = usuarioLogado?.email || 'usuario@sistema.com';
 const userName = usuarioLogado?.name || (isAdmin ? "Admin" : "Usuário Comum");
+
+//modal de export impressão
+const [modalExportarOpen, setModalExportarOpen] = useState(false);
 
 const [exibirModalConfirmacao, setExibirModalConfirmacao] = useState(false);
 
@@ -318,24 +323,93 @@ const confirmarLimpeza = () => {
 		setProdutoSelecionadoIndex(index === produtoSelecionadoIndex ? null : index);
 	};
 
-	const gerarPDF = () => {
-		const doc = new jsPDF();
-		doc.text("Relatório de gestão de compras", 10, 10);
-		const tableColumn = ["EAN", "Nome", "Valor Unitário", "Quantidade", "Total"];
-		const tableRows = produtos.map((p) => [
-			p.ean || "-",
-			p.nome,
-			`R$ ${p.valor.toFixed(2)}`,
-			p.quantidade,
-			`R$ ${p.total.toFixed(2)}`
-		]);
+	// SUBSTITUA SUA FUNÇÃO gerarPDF() POR ESTAS DUAS FUNÇÕES
 
-		doc.autoTable({ head: [tableColumn], body: tableRows, startY: 20 });
-		const totalCompra = calcularTotalCompra().toFixed(2);
-		const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 30; 
-		doc.text(`Total da Compra: R$ ${totalCompra}`, 10, finalY + 10);
-		doc.save('lista-produtos.pdf');
-	};
+const exportarExcel = () => {
+	if (produtos.length === 0) {
+		setErro("Não há produtos para exportar.");
+		setTimeout(() => setErro(""), 2000);
+		return;
+	}
+
+	const dados = produtos.map((produto) => ({
+		EAN: produto.ean || "-",
+		Produto: produto.nome,
+		"Valor Unitário": produto.valor,
+		Quantidade: produto.quantidade,
+		Total: produto.total
+	}));
+
+	// adiciona total geral no final
+	dados.push({
+		EAN: "",
+		Produto: "TOTAL GERAL",
+		"Valor Unitário": "",
+		Quantidade: "",
+		Total: calcularTotalCompra()
+	});
+
+	const worksheet = XLSX.utils.json_to_sheet(dados);
+	const workbook = XLSX.utils.book_new();
+
+	XLSX.utils.book_append_sheet(
+		workbook,
+		worksheet,
+		"Lista de Compras"
+	);
+
+	const excelBuffer = XLSX.write(workbook, {
+		bookType: "xlsx",
+		type: "array"
+	});
+
+	const data = new Blob(
+		[excelBuffer],
+		{
+			type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+		}
+	);
+
+	saveAs(data, "lista-compras.xlsx");
+};
+
+
+const exportarPDF = () => {
+	if (produtos.length === 0) {
+		setErro("Não há produtos para exportar.");
+		setTimeout(() => setErro(""), 2000);
+		return;
+	}
+
+	const doc = new jsPDF();
+
+	doc.setFontSize(16);
+	doc.text("Relatório de Gestão de Compras", 14, 15);
+
+	const tableRows = produtos.map((produto) => [
+		produto.ean || "-",
+		produto.nome,
+		`R$ ${produto.valor.toFixed(2)}`,
+		produto.quantidade,
+		`R$ ${produto.total.toFixed(2)}`
+	]);
+
+	autoTable(doc, {
+		head: [["EAN", "Produto", "Valor Unit.", "Qtd", "Total"]],
+		body: tableRows,
+		startY: 25,
+	});
+
+	const finalY = doc.lastAutoTable?.finalY || 30;
+
+	doc.text(
+		`TOTAL GERAL: R$ ${calcularTotalCompra().toFixed(2)}`,
+		14,
+		finalY + 10
+	);
+
+	doc.save("lista-produtos.pdf");
+};
 
 	// -------------------------------------------------------------
 	// RENDERIZAÇÃO
@@ -460,24 +534,35 @@ const confirmarLimpeza = () => {
 					)}
 					
 					{/* BOTÕES DE CONTROLE - DENTRO DO CONTAINER PRINCIPAL */}
-					<div className="flex justify-between w-full mt-4">
-						<button onClick={() => { setIsOpen(true); setEditandoIndex(null); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold">
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4 w-full">
+						<button
+							onClick={() => {
+								setIsOpen(true);
+								setEditandoIndex(null);
+							}}
+							className="w-full h-12 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold flex items-center justify-center"
+						>
 							+ Adicionar Produto
 						</button>
 
-						{/* <button onClick={gerarPDF} className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-semibold">
-							Gerar Relatório PDF
-						</button> */}
-
-						{/* Botão de Limpar Lista */}
 						{produtos.length > 0 && (
-							<button 
-								onClick={handleLimparLista} 
-								className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-semibold"
-							>
-								Limpar Lista
-							</button>
+							<>
+								<button
+									onClick={() => setModalExportarOpen(true)}
+									className="w-full h-12 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center"
+								>
+									Exportar
+								</button>
+
+								<button
+									onClick={handleLimparLista}
+									className="w-full h-12 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold flex items-center justify-center"
+								>
+									Limpar Lista
+								</button>
+							</>
 						)}
+
 					</div>
 				</div>
 				{/* Modal de Confirmação */}
@@ -509,6 +594,64 @@ const confirmarLimpeza = () => {
 								>
 									Cancelar
 								</button>
+							</div>
+						</div>
+					</div>
+				)}
+
+				{/* Modal de Exportação */}
+				{modalExportarOpen && (
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+						<div
+							className={`w-full max-w-md p-6 rounded-2xl shadow-2xl ${
+								modoNoturno
+									? "bg-gray-800 text-white"
+									: "bg-white text-gray-800"
+							}`}
+						>
+							<div className="text-center">
+								<h2 className="text-2xl font-bold mb-2">
+									Exportar Relatório
+								</h2>
+
+								<p className="text-sm opacity-80 mb-6">
+									Escolha o formato que deseja exportar
+								</p>
+							</div>
+
+							<div className="flex flex-col gap-3">
+
+								<button
+									onClick={() => {
+										exportarExcel();
+										setModalExportarOpen(false);
+									}}
+									className="w-full h-12 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold"
+								>
+									Exportar em Excel
+								</button>
+
+								<button
+									onClick={() => {
+										exportarPDF();
+										setModalExportarOpen(false);
+									}}
+									className="w-full h-12 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition font-semibold"
+								>
+									Exportar em PDF
+								</button>
+
+								<button
+									onClick={() => setModalExportarOpen(false)}
+									className={`w-full h-12 rounded-xl font-semibold transition ${
+										modoNoturno
+											? "bg-gray-700 hover:bg-gray-600"
+											: "bg-gray-100 hover:bg-gray-200"
+									}`}
+								>
+									Cancelar
+								</button>
+
 							</div>
 						</div>
 					</div>

@@ -711,7 +711,7 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                 </div>
 
                 {/* BOTÕES DE CONTROLE - DENTRO DO CONTAINER PRINCIPAL */}
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4 w-full">
+					<div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 gap-2 mt-4 w-full">
                         <button
                             onClick={() => handleOpenModal()}
                             className={`w-full h-12 rounded-lg text-white font-semibold flex items-center justify-center ${
@@ -727,17 +727,16 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                         {produtos.length > 0 && (
                             <>
                                 <button
-                                    onClick={() => setModalExportarOpen(true)}
-                                    className="w-full h-12 bg-gray-700 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center"
-                                >
-                                    Exportar
-                                </button>
-
-                                <button
                                     onClick={handleLimparLista}
                                     className="w-full h-12 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold flex items-center justify-center"
                                 >
                                     Limpar Lista
+                                </button>
+                                <button
+                                    onClick={() => setModalExportarOpen(true)}
+                                    className="w-full h-12 col-span-2 bg-gray-700 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center"
+                                >
+                                    Exportar
                                 </button>
                             </>
                         )}

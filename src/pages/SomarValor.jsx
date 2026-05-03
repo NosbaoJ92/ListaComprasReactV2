@@ -441,28 +441,32 @@ const exportarPDF = () => {
 				 
 				{/* Header/Barra para Mobile com Botão de Menu (Substitui os botões fixos de Home e Tema) */}
 				<header className="flex items-center justify-between mb-8 md:hidden">
-					<button 
-						onClick={toggleMenu} 
-						className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
-					>
-						☰
-					</button>
-					<div
-                        className={`max-w-4xl mx-auto py-4 px-4 sm:px-6 lg:px-8 text-center ${
-                            modoNoturno
-                                ? 'bg-gray-900 text-white'
-                                : 'bg-gray-100 text-gray-900'
-                        }`}
-                    >
-                        <h1 className="text-3xl sm:text-3xl lg:text-4xl font-extrabold">
-                            Lista de Compras 🛒
-                        </h1>
-                    </div>
-					<div className="w-8"></div> {/* Placeholder para alinhar o título centralmente */}
+					<div className="fixed top-0 left-0 w-full z-20">
+						<div
+							className={`max-w-4xl mx-auto flex justify-around py-4 px-4 sm:px-6 lg:px-8 text-center shadow-md rounded-b-xl ${
+								modoNoturno
+									? 'bg-gray-900 text-white'
+									: 'bg-gray-100 text-gray-900'
+							}`}
+						>
+							<button 
+							onClick={toggleMenu} 
+							className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
+							>
+							☰
+							</button>
+							<h1 className="text-3xl sm:text-3xl lg:text-4xl font-extrabold">
+								Lista de Compras 🛒
+							</h1>
+							<h1 className="invisible">
+								
+							</h1>
+                    	</div>
+                	</div>
 				</header>
 
 				{/* Conteúdo da tela SomarValor - ENGLOBA TODOS OS ELEMENTOS DA TELA PRINCIPAL */}
-				<div className="container mx-auto max-w-4xl pt-8 md:pt-0 flex-grow">
+				<div className="container mx-auto max-w-4xl pt-12 md:pt-0 flex-grow">
 					<h1 className="py-4 p-8 text-center text-4xl font-extrabold hidden md:block">Sua Lista de Compras 🛒</h1>
 
 					{/* Lista de produtos */}

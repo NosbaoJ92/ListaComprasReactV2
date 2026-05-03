@@ -38,7 +38,7 @@ const [valorProduto, setValorProduto] = useState("");
 const [quantidadeProduto, setQuantidadeProduto] = useState("");
 const [erro, setErro] = useState("");
 const [editandoIndex, setEditandoIndex] = useState(null);
-const [produtos, setProdutos] = useState([]);
+const [produtos, setProdutos] = useState(items || []);
 const [isOpen, setIsOpen] = useState(false);
 const [produtoSelecionadoIndex, setProdutoSelecionadoIndex] = useState(null);
 
@@ -127,10 +127,15 @@ const confirmarLimpeza = () => {
 	};
 
 	useEffect(() => {
-		const produtosSalvos = localStorage.getItem("produtos");
-		if (produtosSalvos) setProdutos(JSON.parse(produtosSalvos));
-	}, []);
-
+		if (items && items.length > 0) {
+			setProdutos(items);
+		} else {
+			const produtosSalvos = localStorage.getItem("produtos");
+			if (produtosSalvos) {
+				setProdutos(JSON.parse(produtosSalvos));
+			}
+		}
+	}, [items]);
 	useEffect(() => {
 		localStorage.setItem("produtos", JSON.stringify(produtos));
 	}, [produtos]);

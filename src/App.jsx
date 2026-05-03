@@ -6,6 +6,7 @@ import ValorMaximo from './pages/ValorMaximo';
 import GestorEAN from './pages/GestorEAN';
 import ListaPlan from './pages/ListaPlan'; // Importação da nova tela
 import Login from './pages/Login';
+import PaginaBase from './pages/PaginaBase';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 
 // Chaves para o localStorage
@@ -111,8 +112,10 @@ const AppContent = () => {
           items={items}
           setItems={setItems}
           onGoHome={handleGoHome}
-          modoNoturno={modoNoturno} 
+          modoNoturno={modoNoturno}
           usuarioLogado={usuarioLogado}
+          onLogoutSuccess={handleLogout}
+          onSelectOption={handleSelectOption}
         />
       )}
 
@@ -124,7 +127,6 @@ const AppContent = () => {
         onToggleModoNoturno={toggleModoNoturno}
         usuarioLogado={usuarioLogado}
         onLogoutSuccess={handleLogout}
-        // Adicione ou verifique estas duas props:
         items={items} 
         setItems={setItems}
         />
@@ -138,6 +140,8 @@ const AppContent = () => {
           onToggleModoNoturno={toggleModoNoturno}
           usuarioLogado={usuarioLogado}
           onLogoutSuccess={handleLogout}
+          items={items}
+          setItems={setItems}
         />
       )}
 
@@ -155,6 +159,17 @@ const AppContent = () => {
       {/* TELA: GESTOR EAN */}
       {option === 'gestor' && (
         <GestorEAN
+          onGoHome={handleGoHome}
+          modoNoturno={modoNoturno} 
+          onToggleModoNoturno={toggleModoNoturno}
+          usuarioLogado={usuarioLogado}
+          onLogoutSuccess={handleLogout}
+        />
+      )}
+
+      {/* TELA: BASE */}
+      {option === 'base' && (
+        <PaginaBase
           onGoHome={handleGoHome}
           modoNoturno={modoNoturno} 
           onToggleModoNoturno={toggleModoNoturno}

@@ -13,7 +13,13 @@ const COL_QTD = "w-1/5"; // 20%
 const COL_TOTAL = "w-1/5"; // 20%
 
 // O componente agora recebe modoNoturno e onToggleModoNoturno via props
-const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
+const ValorDefinido = ({
+  onGoHome,
+  modoNoturno,
+  onToggleModoNoturno,
+  items = [],
+  setItems
+}) => {
 
     // 1. Inicializa o valor pré-definido lendo do localStorage
     const getInitialValorPreDefinido = () => {
@@ -152,11 +158,18 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
 
     // EFEITOS (Carregar/Salvar)
     useEffect(() => {
-        const produtosSalvos = localStorage.getItem("produtosDefinido");
-        if (produtosSalvos) {
-            setProdutos(JSON.parse(produtosSalvos));
+        if (items.length > 0) {
+            const produtosConvertidos = items.map((item) => ({
+                nome: item.nome,
+                quantidade: item.quantidade || 1,
+                valor: item.valor || 0,
+                total: (item.quantidade || 1) * (item.valor || 0),
+                ean: item.ean || null,
+            }));
+
+            setProdutos(produtosConvertidos);
         }
-    }, []);
+    }, [items]);
 
     useEffect(() => {
         localStorage.setItem("produtosDefinido", JSON.stringify(produtos));

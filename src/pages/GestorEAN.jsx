@@ -21,11 +21,12 @@ const GestorEAN = ({ onGoHome, usuarioLogado }) => {
 
   // --- Menu lateral dinâmico
   const menuItems = [
-    { id: "home", icon: "🏠", type: "link", description: "Voltar para a seleção de modo" },
-    { id: "gestor", icon: "📦", type: "link", description: "Gerenciar códigos de barras" },
-    // { id: "settings", icon: "⚙️", type: "link", description: "Ajustes do sistema" },
-    { id: "themeToggle", icon: "🌙", type: "toggleTheme", description: `Tema: ${modoNoturno ? "Escuro" : "Claro"}` },
-  ];
+    { id: 'home', icon: '🏠', type: 'link', description: 'Voltar para a seleção de modo' },
+    { id: 'gestor', icon: '📦', type: 'link', description: 'Gerenciar códigos de barras' },
+    { id: 'base', icon: '⚙️', type: 'link', description: 'Tela base do sistema' },
+    { id: 'lista', icon: '⚙️', type: 'link', description: 'Tela de Lista Plan' },
+    { id: 'themeToggle', icon: '🌙', type: 'toggleTheme', description: `Tema: ${modoNoturno ? 'Escuro' : 'Claro'}` },
+ ];
 
   const accountInfo = {
     username: userName,

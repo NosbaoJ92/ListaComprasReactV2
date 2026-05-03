@@ -542,16 +542,18 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
             </button>
 
             <div className="container mx-auto max-w-4xl pt-24 flex-grow">
-                <div
-                    className={`fixed top-0 z-40 py-4 text-center shadow-md ${
-                        modoNoturno
-                            ? 'bg-gray-900 text-white'
-                            : 'bg-gray-100 text-gray-900'
-                    }`}
-                >
-                    <h1 className="text-4xl font-extrabold">
-                        Gerenciador de Orçamento 💰
-                    </h1>
+                <div className="fixed top-0 left-0 w-full z-40">
+                    <div
+                        className={`max-w-4xl mx-auto py-4 px-4 sm:px-6 lg:px-8 text-center shadow-md rounded-b-xl ${
+                            modoNoturno
+                                ? 'bg-gray-900 text-white'
+                                : 'bg-gray-100 text-gray-900'
+                        }`}
+                    >
+                        <h1 className="text-3xl sm:text-3xl lg:text-4xl font-extrabold">
+                            Gerenciador de Orçamento 💰
+                        </h1>
+                    </div>
                 </div>
                 {/* Bloco de Aviso de Estouro - Visível no corpo principal */}
                 {avisoEstouro && (

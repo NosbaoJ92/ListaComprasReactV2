@@ -447,7 +447,17 @@ const exportarPDF = () => {
 					>
 						☰
 					</button>
-					<h1 className="text-xl font-bold">Lista de Compras 🛒</h1>
+					<div
+                        className={`max-w-4xl mx-auto py-4 px-4 sm:px-6 lg:px-8 text-center shadow-md rounded-b-xl ${
+                            modoNoturno
+                                ? 'bg-gray-900 text-white'
+                                : 'bg-gray-100 text-gray-900'
+                        }`}
+                    >
+                        <h1 className="text-3xl sm:text-3xl lg:text-4xl font-extrabold">
+                            Lista de Compras 🛒
+                        </h1>
+                    </div>
 					<div className="w-8"></div> {/* Placeholder para alinhar o título centralmente */}
 				</header>
 

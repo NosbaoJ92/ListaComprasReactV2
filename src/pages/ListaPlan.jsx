@@ -99,26 +99,15 @@ const ListaPlan = ({
             onClick={toggleMenu} 
             className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
           > ☰ </button>
-          <h1 className="text-xl font-bold">Lista Plan</h1>
+          <div>
+              <h1 className="text-2xl sm:text-4xl font-extrabold">Planejamento 🛒</h1>
+              <p className="opacity-60 text-xs font-bold uppercase tracking-widest">Monte sua lista</p>
+            </div>
           <div className="w-8"></div>
         </header>
 
         {/* Conteúdo com Scroll Interno */}
-        <div className="flex-grow flex flex-col max-w-2xl mx-auto w-full overflow-hidden">
-          
-          <div className="flex-shrink-0 flex justify-between items-end mb-6">
-            <div>
-              <h1 className="text-2xl sm:text-4xl font-extrabold">Planejamento 🛒</h1>
-              <p className="opacity-60 text-xs font-bold uppercase tracking-widest">Monte sua lista</p>
-            </div>
-            {items.length > 0 && (
-              <button 
-                onClick={() => setExibirModalConfirmacao(true)}
-                className="text-xs font-bold text-red-500 hover:underline px-2 py-1"
-              >LIMPAR TUDO</button>
-            )}
-          </div>
-
+        <div className="flex-grow flex flex-col max-w-2xl mx-auto w-full overflow-hidden"> 
           {/* Form fixo no topo da área de conteúdo */}
           <div className={`flex-shrink-0 p-4 rounded-2xl shadow-lg mb-6 border-2 ${modoNoturno ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
             <form onSubmit={addItem} className="flex flex-col gap-3">
@@ -177,6 +166,14 @@ const ListaPlan = ({
             <div className="h-24"></div>
           </div>
         </div>
+        <div className="flex-shrink-0 flex justify-center items-end mb-6">
+            {items.length > 0 && (
+              <button 
+                onClick={() => setExibirModalConfirmacao(true)}
+                className="text-xs font-bold text-red-500 hover:underline px-2 py-1"
+              >LIMPAR TUDO</button>
+            )}
+          </div>
 
         {/* Botão de Finalização Fixo no Rodapé */}
         {items.length > 0 && (
@@ -185,7 +182,8 @@ const ListaPlan = ({
               onClick={() => setShowFinalizeOptions(true)}
               className="w-full py-5 bg-green-600 hover:bg-green-700 text-white text-xl font-black rounded-2xl shadow-xl transition-all transform active:scale-95 flex items-center justify-center gap-3"
             >
-              IR PARA O MERCADO ({items.length})
+              IR PARA O MERCADO 
+              {/* ({items.length}) */}
               <span className="text-2xl">➔</span>
             </button>
           </div>

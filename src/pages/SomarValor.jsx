@@ -106,7 +106,6 @@ const confirmarLimpeza = () => {
 	const baseMenuOptions = [
   { id: 'home', icon: '🏠', type: 'link', description: 'Voltar para a seleção de modo' },
   { id: 'gestor', icon: '📦', type: 'link', description: 'Gerenciar códigos de barras' },
-	//   { id: 'settings', icon: '⚙️', type: 'link', description: 'Ajustes do sistema' },
   { id: 'themeToggle', icon: '🌙', type: 'toggleTheme', description: `Tema: ${modoNoturno ? 'Escuro' : 'Claro'}` },
 ];
 
@@ -203,7 +202,7 @@ const confirmarLimpeza = () => {
 		}
 	};
 
-	// 🔹 Scanner
+	//  SCANNER EAN
 	useEffect(() => {
 		if (!leitorAtivo) {
 			if (codeReaderRef.current) codeReaderRef.current.reset();
@@ -443,15 +442,15 @@ const exportarPDF = () => {
 			<main className="flex-grow flex flex-col h-full p-4 sm:p-8 overflow-hidden">
 				{/* Header Mobile - Idêntico à TelaInicial */}
 				<header className="md:hidden flex-shrink-0 flex items-center justify-between mb-4">
-				<button 
-					onClick={toggleMenu} 
-					className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
-				> ☰ </button>
-				<div>
-					<h1 className="text-2xl sm:text-4xl font-extrabold">Lista de Compra 🛒</h1>
-					<p className="opacity-60 text-xs font-bold uppercase tracking-widest">Somar valor</p>
-					</div>
-				<div className="w-8"></div>
+					<button 
+						onClick={toggleMenu} 
+						className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
+					> ☰ </button>
+					<div>
+						<h1 className="text-2xl sm:text-4xl font-extrabold">Lista de Compra 🛒</h1>
+						<p className="opacity-60 text-xs font-bold uppercase tracking-widest">Somar valor</p>
+						</div>
+					<div className="w-8"></div>
 				</header>
 
 				{/* Conteúdo da tela SomarValor - ENGLOBA TODOS OS ELEMENTOS DA TELA PRINCIPAL */}

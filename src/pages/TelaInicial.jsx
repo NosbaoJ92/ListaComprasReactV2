@@ -100,7 +100,7 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
   <div className="flex flex-col h-full w-full max-w-xl mx-auto overflow-hidden">
     {/* Título - Fixo */}
     <div className="flex-shrink-0">
-      <h1 className="py-4 text-center text-2xl sm:text-4xl font-extrabold">Bem-vindo à Lista de Compras - Online</h1>
+      <h1 className="py-4 text-center text-3xl sm:text-4xl font-extrabold">Bem-vindo à Lista de Compras - Online</h1>
     </div>
 
     {/* Área de Opções - Scroll Interno */}
@@ -191,9 +191,6 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
         onClick={toggleMenu} 
         className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
       > ☰ </button>
-      <h1 className="invisible">
-        {globalMenuOptions.find(item => item.id === currentPage)?.label || ' ComApppras'}
-      </h1>
       <div className="w-8"></div>
     </header>
 

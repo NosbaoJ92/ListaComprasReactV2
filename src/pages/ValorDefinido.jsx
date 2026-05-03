@@ -38,6 +38,9 @@ const ValorDefinido = ({
     const [editandoIndex, setEditandoIndex] = useState(null);
     const [produtoSelecionadoIndex, setProdutoSelecionadoIndex] = useState(null);
 
+    const closeMenu = () => setIsMenuOpen(false);
+    const toggleMenu = () => setIsMenuOpen(prev => !prev);
+
     //EXPORTANDO EM EXCEL/PDF
     const [modalExportarOpen, setModalExportarOpen] = useState(false);
 
@@ -549,31 +552,26 @@ const ValorDefinido = ({
 
     return (
         <div className={`min-h-screen p-6 relative flex flex-col ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
-            <button onClick={onGoHome} className="fixed top-4 left-4 z-50 p-3 rounded-full shadow-lg transition duration-300 bg-white text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">🏠</button>
-            <button onClick={onToggleModoNoturno} className="fixed top-4 right-4 z-50 p-3 rounded-full shadow-lg transition duration-300 bg-white text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
-                {modoNoturno ? '☀️' : '🌙'}
-            </button>
-
-            <div className="container mx-auto max-w-4xl pt-24 flex-grow">
-                <div className="fixed top-0 left-0 w-full z-40">
-                    <div
-                        className={`max-w-4xl mx-auto py-4 px-4 sm:px-6 lg:px-8 text-center shadow-md rounded-b-xl ${
-                            modoNoturno
-                                ? 'bg-gray-900 text-white'
-                                : 'bg-gray-100 text-gray-900'
-                        }`}
-                    >
-                        <h1 className="text-3xl sm:text-3xl lg:text-4xl font-extrabold">
-                            Gerenciador de Orçamento 💰
-                        </h1>
+            
+           <header className="md:hidden flex-shrink-0 flex items-center justify-between mb-4">
+					<button 
+						onClick={toggleMenu} 
+						className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
+					> ☰ </button>
+					<div>
+						<h1 className="text-2xl sm:text-4xl font-extrabold">Gerenciar Orçamento 🛒</h1>
+						<p className="opacity-60 text-xs font-bold uppercase tracking-widest">Controle de gastos</p>
                     </div>
-                </div>
+					<div className="w-"></div>
+				</header>
+
+            <div className="container mx-auto max-w-4xl flex-grow">
                 {/* Bloco de Aviso de Estouro - Visível no corpo principal */}
                 {avisoEstouro && (
                     <div className="p-3 mb-4 text-center rounded-lg bg-red-100 border border-red-400 text-red-800 dark:bg-red-900/50 dark:border-red-600 dark:text-red-400 font-semibold shadow-md">
                         {avisoEstouro}
                     </div>
-                )}
+                )}                
                 
                 {/* ----------------------------------------------------------------- */}
                 {/* ORÇAMENTO MÁXIMO (Budget Block) */}

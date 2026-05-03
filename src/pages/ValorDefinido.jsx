@@ -728,7 +728,7 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                             <>
                                 <button
                                     onClick={() => setModalExportarOpen(true)}
-                                    className="w-full h-12 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center"
+                                    className="w-full h-12 bg-gray-700 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center"
                                 >
                                     Exportar
                                 </button>
@@ -790,13 +790,13 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                                 Escolha o formato de exportação
                             </h2>
 
-                            <div className="flex flex-col gap-3">
-                                <button
+                            <div className="flex  gap-3">
+                                 <button
                                     onClick={() => {
                                         exportarExcel();
                                         setModalExportarOpen(false);
                                     }}
-                                    className="w-full h-12 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold"
+                                    className="w-full h-16 bg-gray-700 text-white rounded-xl hover:bg-green-700 transition font-semibold"
                                 >
                                     Exportar em Excel
                                 </button>
@@ -806,16 +806,17 @@ const ValorDefinido = ({ onGoHome, modoNoturno, onToggleModoNoturno }) => {
                                         exportarPDF();
                                         setModalExportarOpen(false);
                                     }}
-                                    className="w-full h-12 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition font-semibold"
+                                    className="w-full h-16 bg-gray-700 text-white rounded-xl hover:bg-purple-700 transition font-semibold"
                                 >
                                     Exportar em PDF
                                 </button>
-
+                            </div>
+                            <div className="flex mt-4 gap-3">
                                 <button
                                     onClick={() => setModalExportarOpen(false)}
                                     className={`w-full h-12 rounded-xl font-semibold transition ${
                                         modoNoturno
-                                            ? 'bg-gray-700 hover:bg-gray-600'
+                                            ? 'bg-red-700 hover:bg-gray-600'
                                             : 'bg-gray-100 hover:bg-gray-200'
                                     }`}
                                 >

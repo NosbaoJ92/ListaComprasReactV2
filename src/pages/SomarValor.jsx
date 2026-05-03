@@ -106,9 +106,9 @@ const confirmarLimpeza = () => {
 	const baseMenuOptions = [
   { id: 'home', icon: '🏠', type: 'link', description: 'Voltar para a seleção de modo' },
   { id: 'gestor', icon: '📦', type: 'link', description: 'Gerenciar códigos de barras' },
-//   { id: 'settings', icon: '⚙️', type: 'link', description: 'Ajustes do sistema' },
+	//   { id: 'settings', icon: '⚙️', type: 'link', description: 'Ajustes do sistema' },
   { id: 'themeToggle', icon: '🌙', type: 'toggleTheme', description: `Tema: ${modoNoturno ? 'Escuro' : 'Claro'}` },
- ];
+];
 
 	// FILTRAGEM DO MENU: Aplica a restrição de ADMIN
 	const globalMenuOptions = baseMenuOptions.filter(item => {
@@ -437,7 +437,7 @@ const exportarPDF = () => {
 
 
 			{/* 2. Conteúdo Principal */}
-			<main className="flex-grow p-4 sm:p-8 overflow-y-auto">
+			<main className="flex-grow px-4 sm:p-8 overflow-y-auto">
 				 
 				{/* Header/Barra para Mobile com Botão de Menu (Substitui os botões fixos de Home e Tema) */}
 				<header className="flex items-center justify-between mb-8 md:hidden">
@@ -448,7 +448,7 @@ const exportarPDF = () => {
 						☰
 					</button>
 					<div
-                        className={`max-w-4xl mx-auto py-4 px-4 sm:px-6 lg:px-8 text-center shadow-md rounded-b-xl ${
+                        className={`max-w-4xl mx-auto py-4 px-4 sm:px-6 lg:px-8 text-center ${
                             modoNoturno
                                 ? 'bg-gray-900 text-white'
                                 : 'bg-gray-100 text-gray-900'
@@ -559,7 +559,7 @@ const exportarPDF = () => {
 							<>
 								<button
 									onClick={() => setModalExportarOpen(true)}
-									className="w-full h-12 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center"
+									className="w-full h-12 bg-gray-700 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center"
 								>
 									Exportar
 								</button>
@@ -611,61 +611,54 @@ const exportarPDF = () => {
 
 				{/* Modal de Exportação */}
 				{modalExportarOpen && (
-					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-						<div
-							className={`w-full max-w-md p-6 rounded-2xl shadow-2xl ${
-								modoNoturno
-									? "bg-gray-800 text-white"
-									: "bg-white text-gray-800"
-							}`}
-						>
-							<div className="text-center">
-								<h2 className="text-2xl font-bold mb-2">
-									Exportar Relatório
-								</h2>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                        <div
+                            className={`w-full max-w-md p-6 rounded-2xl shadow-2xl ${
+                                modoNoturno
+                                    ? 'bg-gray-800 text-white'
+                                    : 'bg-white text-gray-800'
+                            }`}
+                        >
+                            <h2 className="text-xl font-bold text-center mb-6">
+                                Escolha o formato de exportação
+                            </h2>
 
-								<p className="text-sm opacity-80 mb-6">
-									Escolha o formato que deseja exportar
-								</p>
+                            <div className="flex h-full gap-3">
+                                <button
+                                    onClick={() => {
+                                        exportarExcel();
+                                        setModalExportarOpen(false);
+                                    }}
+                                    className="w-full h-16 bg-gray-700 text-white rounded-xl hover:bg-green-700 transition font-semibold"
+                                >
+                                    Exportar em Excel
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        exportarPDF();
+                                        setModalExportarOpen(false);
+                                    }}
+                                    className="w-full h-16 bg-gray-700 text-white rounded-xl hover:bg-purple-700 transition font-semibold"
+                                >
+                                    Exportar em PDF
+                                </button>
 							</div>
-
-							<div className="flex flex-col gap-3">
-
-								<button
-									onClick={() => {
-										exportarExcel();
-										setModalExportarOpen(false);
-									}}
-									className="w-full h-12 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold"
-								>
-									Exportar em Excel
-								</button>
-
-								<button
-									onClick={() => {
-										exportarPDF();
-										setModalExportarOpen(false);
-									}}
-									className="w-full h-12 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition font-semibold"
-								>
-									Exportar em PDF
-								</button>
-
-								<button
-									onClick={() => setModalExportarOpen(false)}
-									className={`w-full h-12 rounded-xl font-semibold transition ${
-										modoNoturno
-											? "bg-gray-700 hover:bg-gray-600"
-											: "bg-gray-100 hover:bg-gray-200"
-									}`}
-								>
-									Cancelar
-								</button>
-
-							</div>
-						</div>
-					</div>
-				)}
+							<div className="flex mt-4 gap-3">
+                                <button
+                                    onClick={() => setModalExportarOpen(false)}
+                                    className={`w-full h-12 rounded-xl font-semibold transition ${
+                                        modoNoturno
+                                            ? 'bg-red-700 hover:bg-gray-600'
+                                            : 'bg-gray-100 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
 				{/* Modal (DEVE FICAR FORA DO CONTAINER DE CONTEÚDO PARA FUNCIONAR COMO OVERLAY) */}
 				{isOpen && (

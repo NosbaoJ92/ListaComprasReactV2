@@ -113,7 +113,7 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
           <input type="radio" value="lista" checked={option === 'lista'} onChange={handleMainOptionChange} className="hidden"/>
           <div className="flex flex-col items-center cursor-pointer">
             <span className="w-10 h-10 mb-2 flex items-center justify-center text-blue-500 font-bold text-3xl">📝</span>
-            <p className="font-semibold text-lg text-center">Criar Lista</p>
+            <p className="font-semibold text-sm text-center">Criar Lista</p>
             <p className="text-center mt-1 opacity-75 text-xs">Planeje suas compras antes de ir ao mercado.</p>
           </div>
         </label>
@@ -122,7 +122,7 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
           <input type="radio" value="somar" checked={option === 'somar'} onChange={handleMainOptionChange} className="hidden"/>
           <div className="flex flex-col items-center cursor-pointer">
             <span className="w-10 h-10 mb-2 flex items-center justify-center text-blue-500 font-bold text-3xl">∑</span>
-            <p className="font-semibold text-lg text-center">Somar Valores</p>
+            <p className="font-semibold text-sm text-center">Somar Valores</p>
             <p className="text-center mt-1 opacity-75 text-xs">Acompanhe o total gasto em tempo real.</p>
           </div>
         </label>
@@ -131,7 +131,7 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
           <input type="radio" value="estipular" checked={option === 'estipular'} onChange={handleMainOptionChange} className="hidden"/>
           <div className="flex flex-col items-center cursor-pointer">
             <span className="w-10 h-10 mb-2 flex items-center justify-center text-blue-500 font-bold text-3xl">$</span>
-            <p className="font-semibold text-lg text-center">Estipular Valor</p>
+            <p className="font-semibold text-sm text-center">Estipular Valor</p>
             <p className="text-center mt-1 opacity-75 text-xs">Defina um limite de orçamento ou valor inicial.</p>
           </div>
         </label>

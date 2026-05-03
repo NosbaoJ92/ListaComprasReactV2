@@ -546,13 +546,12 @@ const ValorDefinido = ({
     const valorMaximo = parseFloat(valorPreDefinido.replace(',', '.')) || 1; // Evita divisão por zero
     const totalGasto = calcularTotalCompra();
     const percentual = Math.min((totalGasto / valorMaximo) * 100, 100);
-    // CORRIGIDO: Use uma cor mais forte se o totalGasto for MAIOR que o valorMaximo (estouro)
     const corProgresso = totalGasto > valorMaximo ? 'bg-red-700' : percentual >= 90 ? 'bg-red-500' : percentual >= 70 ? 'bg-yellow-500' : 'bg-green-500';
 
     return (
         <div className={`min-h-screen p-6 relative flex flex-col ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
-            <button onClick={onGoHome} className="fixed top-4 left-4 z-50 p-3 rounded-full shadow-lg transition duration-300 bg-white text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">🏠</button>
-            <button onClick={onToggleModoNoturno} className="fixed top-4 right-4 z-50 p-3 rounded-full shadow-lg transition duration-300 bg-white text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+            <button onClick={onGoHome} className="fixed top-16 left-4 z-50 p-2 rounded-lg shadow-lg transition duration-300 bg-white text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">🏠</button>
+            <button onClick={onToggleModoNoturno} className="fixed top-16 left-14 z-50 p-2 rounded-lg shadow-lg transition duration-300 bg-white text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
                 {modoNoturno ? '☀️' : '🌙'}
             </button>
 
@@ -584,7 +583,7 @@ const ValorDefinido = ({
                 </div>
                 <div className=""></div>
             </header>
-
+            <h1 className="py-4 p-8 text-center text-4xl font-extrabold hidden md:block">Gerenciar Orçamento 🛒</h1>
             <div className="container mx-auto max-w-4xl pt-20 flex-grow">
                 {/* Bloco de Aviso de Estouro - Visível no corpo principal */}
                 {avisoEstouro && (
@@ -593,9 +592,6 @@ const ValorDefinido = ({
                     </div>
                 )}
                 
-                {/* ----------------------------------------------------------------- */}
-                {/* ORÇAMENTO MÁXIMO (Budget Block) */}
-                {/* ----------------------------------------------------------------- */}
                 <div className={`p-4 mb-6 rounded-xl shadow-xl ${modoNoturno ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'}`}>
                     <div className="flex justify-between items-start">
                         <h2 className="text-lg font-bold mb-2">Orçamento Máximo Definido</h2>

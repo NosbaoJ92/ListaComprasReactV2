@@ -92,9 +92,13 @@ const ListaPlan = ({
         onClose={closeMenu}
       />
 
-      <main className="flex-grow flex flex-col h-full p-4 sm:p-8 overflow-hidden">
+      <main className="flex-grow flex flex-col h-full p-4 sm:p-8 overflow-hidden relative">
         {/* Header Mobile - Idêntico à TelaInicial */}
-        <header className="md:hidden flex-shrink-0 flex items-center justify-between mb-4">
+        <header className={`md:hidden flex-shrink-0 flex items-center justify-between p-4 fixed top-0 left-0 w-full z-20 shadow-md rounded-b-xl ${
+                            modoNoturno
+                                ? 'bg-gray-900 text-white'
+                                : 'bg-gray-100 text-gray-900'
+                        }`}>
           <button 
             onClick={toggleMenu} 
             className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
@@ -107,7 +111,7 @@ const ListaPlan = ({
         </header>
 
         {/* Conteúdo com Scroll Interno */}
-        <div className="flex-grow flex flex-col max-w-2xl mx-auto w-full overflow-hidden"> 
+        <div className="flex-grow flex flex-col max-w-2xl mx-auto w-full overflow-hidden mt-20"> 
           {/* Form fixo no topo da área de conteúdo */}
           <div className={`flex-shrink-0 p-4 rounded-2xl shadow-lg mb-6 border-2 ${modoNoturno ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
             <form onSubmit={addItem} className="flex flex-col gap-3">
@@ -166,11 +170,11 @@ const ListaPlan = ({
             <div className="h-24"></div>
           </div>
         </div>
-        <div className="flex-shrink-0 flex justify-center items-end mb-6">
+        <div className="flex-shrink-0 flex justify-end items-end mt-4">
             {items.length > 0 && (
               <button 
                 onClick={() => setExibirModalConfirmacao(true)}
-                className="text-xs font-bold text-red-500 hover:underline px-2 py-1"
+                className="text-xs font-bold bg-red-700 text-white hover:underline px-2 py-1"
               >LIMPAR TUDO</button>
             )}
           </div>

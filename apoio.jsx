@@ -567,17 +567,17 @@ const ValorDefinido = ({
     return (
         <div className={`min-h-screen p-6 relative flex flex-col ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
             
-           <header className="md:hidden flex-shrink-0 flex items-center justify-between mb-4">
-                    <button 
-                        onClick={toggleMenu} 
-                        className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
-                    > ☰ </button>
-                    <div>
-                        <h1 className="text-2xl sm:text-4xl font-extrabold">Gerenciar Orçamento 🛒</h1>
-                        <p className="opacity-60 text-xs font-bold uppercase tracking-widest">Controle de gastos</p>
-                    </div>
-                    <div className="w-"></div>
-                </header>
+            <header className="md:hidden flex-shrink-0 flex items-center justify-between mb-4">
+                <button 
+                    onClick={toggleMenu} 
+                    className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
+                > ☰ </button>
+                <div>
+                    <h1 className="text-2xl sm:text-4xl font-extrabold">Gerenciar Orçamento 🛒</h1>
+                    <p className="opacity-60 text-xs font-bold uppercase tracking-widest">Controle de gastos</p>
+                </div>
+                <div className=""></div>
+            </header>
 
             <div className="container mx-auto max-w-4xl flex-grow">
                 {/* Bloco de Aviso de Estouro - Visível no corpo principal */}

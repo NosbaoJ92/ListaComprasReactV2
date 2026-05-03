@@ -38,7 +38,6 @@ const ValorDefinido = ({
     const [editandoIndex, setEditandoIndex] = useState(null);
     const [produtoSelecionadoIndex, setProdutoSelecionadoIndex] = useState(null);
 
-    const closeMenu = () => setIsMenuOpen(false);
     const toggleMenu = () => setIsMenuOpen(prev => !prev);
 
     //EXPORTANDO EM EXCEL/PDF
@@ -552,26 +551,47 @@ const ValorDefinido = ({
 
     return (
         <div className={`min-h-screen p-6 relative flex flex-col ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
-            
-           <header className="md:hidden flex-shrink-0 flex items-center justify-between mb-4">
-					<button 
-						onClick={toggleMenu} 
-						className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
-					> ☰ </button>
-					<div>
-						<h1 className="text-2xl sm:text-4xl font-extrabold">Gerenciar Orçamento 🛒</h1>
-						<p className="opacity-60 text-xs font-bold uppercase tracking-widest">Controle de gastos</p>
-                    </div>
-					<div className="w-"></div>
-				</header>
+            <button onClick={onGoHome} className="fixed top-4 left-4 z-50 p-3 rounded-full shadow-lg transition duration-300 bg-white text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">🏠</button>
+            <button onClick={onToggleModoNoturno} className="fixed top-4 right-4 z-50 p-3 rounded-full shadow-lg transition duration-300 bg-white text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600">
+                {modoNoturno ? '☀️' : '🌙'}
+            </button>
 
-            <div className="container mx-auto max-w-4xl flex-grow">
+             {/* Overlay para Mobile */}
+            {/* {isMenuOpen && (
+                <div className="fixed inset-0 bg-black opacity-50 z-30 md:hidden" onClick={closeMenu} />
+            )}
+
+            <SidebarMenu
+                menuItems={globalMenuOptions}
+                accountInfo={userAccountInfo}
+                activeLink="lista"
+                onNavigate={handleNavigation}
+                isMenuOpen={isMenuOpen}
+                onClose={closeMenu}
+            /> */}
+            <header className={`md:hidden flex-shrink-0 flex items-center justify-between p-4 fixed top-0 left-0 w-full z-20 shadow-md rounded-b-xl ${
+                            modoNoturno
+                                ? 'bg-gray-900 text-white'
+                                : 'bg-gray-100 text-gray-900'
+                        }`}>
+                <button 
+                    onClick={toggleMenu} 
+                    className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
+                > ☰ </button>
+                <div>
+                    <h1 className="text-2xl sm:text-4xl font-extrabold">Gerenciar Orçamento 🛒</h1>
+                    <p className="opacity-60 text-xs font-bold uppercase tracking-widest">Controle de gastos</p>
+                </div>
+                <div className=""></div>
+            </header>
+
+            <div className="container mx-auto max-w-4xl pt-20 flex-grow">
                 {/* Bloco de Aviso de Estouro - Visível no corpo principal */}
                 {avisoEstouro && (
                     <div className="p-3 mb-4 text-center rounded-lg bg-red-100 border border-red-400 text-red-800 dark:bg-red-900/50 dark:border-red-600 dark:text-red-400 font-semibold shadow-md">
                         {avisoEstouro}
                     </div>
-                )}                
+                )}
                 
                 {/* ----------------------------------------------------------------- */}
                 {/* ORÇAMENTO MÁXIMO (Budget Block) */}

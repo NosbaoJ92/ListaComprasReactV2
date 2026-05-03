@@ -439,9 +439,9 @@ const exportarPDF = () => {
 				onClose={closeMenu}
 			/>
 
-			<main className="flex-grow flex flex-col h-full p-4 sm:p-8 overflow-hidden">
+			<main className="flex-grow flex flex-col h-full p-4 sm:p-8 overflow-hidden relative">
 				{/* Header Mobile - Idêntico à TelaInicial */}
-				<header className="md:hidden flex-shrink-0 flex items-center justify-between mb-4">
+				<header className="md:hidden flex-shrink-0 flex items-center justify-between p-4 fixed top-0 left-0 w-full z-20">
 					<button 
 						onClick={toggleMenu} 
 						className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}

@@ -469,7 +469,6 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
             ☰
           </button>
 
-
           <div className="w-11" />
         </header>
 

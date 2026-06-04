@@ -1,121 +1,276 @@
 // SidebarMenu.jsx
 import React from 'react';
-// Importe o ThemeContext para acessar o modoNoturno e toggleModoNoturno
-import { useTheme } from './ThemeContext'; 
-// ... (JSDoc do componente permanece o mesmo) ...
+import { useTheme } from './ThemeContext';
 
 const SidebarMenu = ({
-  menuItems,
-  activeLink, 
+  menuItems = [],
+  activeLink,
   onNavigate,
-  isMenuOpen, 
+  isMenuOpen = false,
   onClose,
-  accountInfo, // Recebe as informações da conta
+  accountInfo = {},
 }) => {
-  const { modoNoturno, toggleModoNoturno } = useTheme(); 
+  const { modoNoturno, toggleModoNoturno } = useTheme();
 
-  // --- Classes de Estilização para Itens de Menu ---
-  const optionClasses = (itemId) => {
-    const isActive = activeLink === itemId;
-    const baseClasses = 'p-4 rounded-lg cursor-pointer transition duration-300 ease-in-out flex items-start space-x-3';
-    
+  const usuarioNome = accountInfo?.username || 'Usuário';
+  const usuarioEmail = accountInfo?.email || 'usuario@app.com';
+  const isAdmin = Boolean(accountInfo?.isAdmin);
+  const primeiraLetra = usuarioNome?.charAt(0)?.toUpperCase() || 'U';
+
+  const handleItemClick = (item) => {
+    if (!item) return;
+
+    if (item.type === 'toggleTheme') {
+      toggleModoNoturno();
+    } else {
+      onNavigate?.(item.id);
+    }
+
+    onClose?.();
+  };
+
+  const getItemTitle = (item) => {
+    if (item.label) return item.label;
+
+    if (item.id === 'home') return 'Início';
+    if (item.id === 'gestor') return 'Gestor';
+    if (item.id === 'lista') return 'Lista';
+    if (item.id === 'somar') return 'Somar';
+    if (item.id === 'estipular') return 'Orçamento';
+    if (item.id === 'themeToggle') return 'Tema';
+
+    return item.description || 'Menu';
+  };
+
+  const getItemDescription = (item) => {
+    if (item.type === 'toggleTheme') {
+      return `Tema: ${modoNoturno ? 'Escuro' : 'Claro'}`;
+    }
+
+    return item.description || '';
+  };
+
+  const getItemIcon = (item) => {
+    if (item.type === 'toggleTheme') {
+      return modoNoturno ? '☀️' : '🌙';
+    }
+
+    return item.icon || '•';
+  };
+
+  const optionClasses = (item) => {
+    const isActive = activeLink === item.id;
+
+    const baseClasses = `
+      group w-full flex items-center gap-3 rounded-2xl px-3 py-3
+      transition-all duration-200 text-left
+      focus:outline-none focus:ring-2 focus:ring-blue-500/40
+    `;
+
     if (modoNoturno) {
       return isActive
-        ? `${baseClasses} border-l-4 border-blue-500 bg-gray-700 text-white shadow-md`
-        : `${baseClasses} border-l-4 border-transparent bg-gray-800 text-gray-200 hover:bg-gray-700`;
-    } else {
-      return isActive
-        ? `${baseClasses} border-l-4 border-blue-600 bg-blue-50 text-blue-800 font-semibold shadow-inner`
-        : `${baseClasses} border-l-4 border-transparent bg-white text-gray-800 hover:bg-gray-50`;
+        ? `${baseClasses} bg-blue-600/20 text-white border border-blue-500/40 shadow-sm`
+        : `${baseClasses} bg-transparent text-gray-300 border border-transparent hover:bg-gray-700/70 hover:text-white`;
     }
+
+    return isActive
+      ? `${baseClasses} bg-blue-50 text-blue-800 border border-blue-200 shadow-sm`
+      : `${baseClasses} bg-transparent text-gray-700 border border-transparent hover:bg-gray-100 hover:text-gray-900`;
   };
 
-  // --- Handler de Clique em Item ---
-  const handleItemClick = (item) => {
+  const iconClasses = (item) => {
+    const isActive = activeLink === item.id;
+
     if (item.type === 'toggleTheme') {
-      toggleModoNoturno(); 
-    } else {
-      onNavigate(item.id);
+      return modoNoturno
+        ? 'bg-yellow-500/15 text-yellow-300'
+        : 'bg-yellow-100 text-yellow-700';
     }
-    // Fecha o menu em mobile após a seleção
-    if (onClose) {
-        onClose();
+
+    if (isActive) {
+      return modoNoturno
+        ? 'bg-blue-500 text-white'
+        : 'bg-blue-600 text-white';
     }
+
+    return modoNoturno
+      ? 'bg-gray-700 text-gray-200 group-hover:bg-gray-600'
+      : 'bg-gray-100 text-gray-700 group-hover:bg-white';
   };
 
-  // --- Classes de Responsividade OTIMIZADAS ---
-  const menuContainerClasses = `
-    h-screen w-64 p-4 flex-shrink-0 shadow-xl 
-    transition-transform duration-300 z-40 
-    
-    flex flex-col justify-between 
-    
-    ${modoNoturno ? 'bg-gray-800' : 'bg-white border-r border-gray-200'}
-    
-    fixed top-0 left-0 
+  const sidebarClasses = `
+    fixed top-0 left-0 z-40 h-screen w-72 max-w-[85vw]
+    flex flex-col overflow-hidden
+    transition-transform duration-300 ease-in-out
     ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-    
-    md:relative md:translate-x-0 md:block md:flex
+    md:relative md:translate-x-0 md:w-72 md:max-w-none
+    ${
+      modoNoturno
+        ? 'bg-gray-800 text-gray-100 border-r border-gray-700'
+        : 'bg-white text-gray-900 border-r border-gray-200'
+    }
   `;
 
   return (
-    <div className={menuContainerClasses}>
-        {/* 1. SEÇÃO PRINCIPAL (Menus de Navegação) */}
-        <div className="flex-grow overflow-y-auto mb-4">
-            <h2 className={`text-2xl text-center font-bold mb-6 ${modoNoturno ? 'text-white' : 'text-gray-900'}`}>
-                Menu Principal
+    <aside className={sidebarClasses}>
+      <div
+        className={`
+          flex-shrink-0 px-5 py-5 border-b
+          ${modoNoturno ? 'border-gray-700' : 'border-gray-200'}
+        `}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-black tracking-tight">
+              Menu Principal
             </h2>
-            <nav className="space-y-2">
-            {menuItems.map((item) => (
-                <div 
-                key={item.id} 
-                className={optionClasses(item.id)}
-                onClick={() => handleItemClick(item)}
-                role="button"
-                tabIndex="0"
-                >
-                <div className={`text-2xl font-bold 
-                    ${activeLink === item.id ? 'text-blue-500' : (item.type === 'toggleTheme' ? 'text-yellow-500' : 'text-gray-500')}`}>
-                    {item.type === 'toggleTheme' ? (modoNoturno ? '☀️' : '🌙') : item.icon}
-                </div>
-                <div>
-                    <p className="font-semibold text-base">{item.label}</p>
-                    <p className="text-xs opacity-75">{item.description}</p>
-                </div>
-                </div>
-            ))}
-            </nav>
-        </div>
 
-        {/* 2. SEÇÃO DE CONTA (Rodapé) */}
-        <div className={`mt-auto pt-4 border-t ${modoNoturno ? 'border-gray-700' : 'border-gray-200'}`}>
-            <h3 className={`font-bold text-sm mb-2 ${modoNoturno ? 'text-gray-400' : 'text-gray-600'}`}>
-                Conta 
-                {accountInfo.isAdmin && <span className="text-blue-500 font-bold ml-2">(ADMIN)</span>}
-            </h3>
-            
-            {/* Informações da Conta (Nome e Email) */}
-            <div className="p-3 rounded-lg flex items-center space-x-3 mb-2">
-                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg">
-                    {accountInfo.username.charAt(0)}
+            <p
+              className={`
+                text-xs mt-1 font-medium
+                ${modoNoturno ? 'text-gray-400' : 'text-gray-500'}
+              `}
+            >
+              Navegação do sistema
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className={`
+              md:hidden w-10 h-10 rounded-2xl flex items-center justify-center text-xl transition
+              ${
+                modoNoturno
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
+              }
+            `}
+            aria-label="Fechar menu"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+
+      <nav className="flex-1 min-h-0 overflow-y-auto px-4 py-4 custom-scrollbar">
+        <div className="space-y-2">
+          {menuItems.map((item) => {
+            const isActive = activeLink === item.id;
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={optionClasses(item)}
+                onClick={() => handleItemClick(item)}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <div
+                  className={`
+                    w-11 h-11 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 transition
+                    ${iconClasses(item)}
+                  `}
+                >
+                  {getItemIcon(item)}
                 </div>
-                <div>
-                    <p className="text-sm font-semibold">{accountInfo.username}</p>
-                    <p className="text-xs opacity-75">{accountInfo.email}</p>
+
+                <div className="min-w-0 flex-1">
+                  <p className="font-black text-sm truncate">
+                    {getItemTitle(item)}
+                  </p>
+
+                  {getItemDescription(item) && (
+                    <p
+                      className={`
+                        text-xs mt-0.5 line-clamp-2
+                        ${modoNoturno ? 'text-gray-400' : 'text-gray-500'}
+                      `}
+                    >
+                      {getItemDescription(item)}
+                    </p>
+                  )}
                 </div>
+
+                {isActive && (
+                  <span
+                    className={`
+                      w-2 h-8 rounded-full flex-shrink-0
+                      ${modoNoturno ? 'bg-blue-400' : 'bg-blue-600'}
+                    `}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      <div
+        className={`
+          flex-shrink-0 px-4 py-4 border-t
+          ${modoNoturno ? 'border-gray-700' : 'border-gray-200'}
+        `}
+      >
+        <div className="mb-3">
+          <div className="flex items-center gap-2 mb-3">
+            <p
+              className={`
+                text-xs font-black uppercase tracking-wide
+                ${modoNoturno ? 'text-gray-400' : 'text-gray-500'}
+              `}
+            >
+              Conta
+            </p>
+
+            {isAdmin && (
+              <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-black">
+                ADMIN
+              </span>
+            )}
+          </div>
+
+          <div
+            className={`
+              rounded-2xl p-3 flex items-center gap-3
+              ${modoNoturno ? 'bg-gray-900/70' : 'bg-gray-50'}
+            `}
+          >
+            <div className="w-11 h-11 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-black text-lg flex-shrink-0">
+              {primeiraLetra}
             </div>
 
-            {/* Botão Sair/Logout */}
-            <button
-                onClick={accountInfo.onLogout} // Esta função fará a mudança para o Login.jsx
-                className={`w-full px-3 py-2 rounded-lg text-sm font-semibold transition-colors duration-300 flex items-center justify-center space-x-2 ${
-                    modoNoturno ? 'bg-red-700 hover:bg-red-600 text-white' : 'bg-red-500 hover:bg-red-600 text-white'
-                }`}
-            >
-                <span>Sair</span>
-            </button>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black truncate">
+                {usuarioNome}
+              </p>
+
+              <p
+                className={`
+                  text-xs truncate
+                  ${modoNoturno ? 'text-gray-400' : 'text-gray-500'}
+                `}
+              >
+                {usuarioEmail}
+              </p>
+            </div>
+          </div>
         </div>
-    </div>
+
+        <button
+          type="button"
+          onClick={accountInfo?.onLogout}
+          className="
+            w-full h-11 rounded-2xl bg-red-600 hover:bg-red-700
+            text-white text-sm font-black transition-all active:scale-95
+            flex items-center justify-center gap-2
+          "
+        >
+          <span>🚪</span>
+          <span>Sair</span>
+        </button>
+      </div>
+    </aside>
   );
 };
 

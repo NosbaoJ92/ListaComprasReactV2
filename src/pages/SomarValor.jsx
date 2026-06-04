@@ -1,825 +1,1365 @@
-import { useState, useEffect, useRef } from "react";
-import { useTheme } from '../components/ThemeContext'; 
-import { BrowserMultiFormatReader } from "@zxing/library";
-import SidebarMenu from '../components/SidebarMenu'; 
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { useState, useEffect, useRef } from 'react';
+import { useTheme } from '../components/ThemeContext';
+import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
+import SidebarMenu from '../components/SidebarMenu';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
-const COL_NOME = "w-2/5";
-const COL_VALOR = "w-1/5";
-const COL_QTD = "w-1/5";
-const COL_TOTAL = "w-1/5";
+const SomarValor = ({
+  items = [],
+  onGoHome,
+  usuarioLogado,
+  onLogoutSuccess,
+  onToggleModoNoturno,
+  onSelectOption,
+}) => {
+  const { modoNoturno, toggleModoNoturno } = useTheme();
 
-/**
-  * Tela principal do sistema após o login.
- * 🔑 AJUSTE: usuarioLogado agora é um OBJETO: { role: 'admin'/'usuario', email: '...', name: '...' }
- * @param {object} usuarioLogado - Objeto com informações do usuário logado, passado pelo App.jsx.
- * @param {function(string, string): void} onSelectOption - Função para navegar para a tela de funcionalidade (App.jsx).
- * @param {function(): void} onLogoutSuccess - A função de logout REAL, passada pelo App.jsx.
- */
-const SomarValor = ({items , onGoHome,  usuarioLogado, onLogoutSuccess, onToggleModoNoturno }) => {
+  const isAdmin = usuarioLogado?.role === 'admin';
+  const userEmail = usuarioLogado?.email || 'usuario@sistema.com';
+  const userName = usuarioLogado?.name || (isAdmin ? 'Admin' : 'Usuário Comum');
 
-const isAdmin = usuarioLogado?.role === 'admin';
-const userEmail = usuarioLogado?.email || 'usuario@sistema.com';
-const userName = usuarioLogado?.name || (isAdmin ? "Admin" : "Usuário Comum");
+  const [produtos, setProdutos] = useState([]);
+  const [ean, setEan] = useState('');
+  const [nomeProduto, setNomeProduto] = useState('');
+  const [valorProduto, setValorProduto] = useState('');
+  const [quantidadeProduto, setQuantidadeProduto] = useState('');
+  const [erro, setErro] = useState('');
 
-//modal de export impressão
-const [modalExportarOpen, setModalExportarOpen] = useState(false);
+  const [editandoIndex, setEditandoIndex] = useState(null);
+  const [produtoSelecionadoIndex, setProdutoSelecionadoIndex] = useState(null);
 
-const [exibirModalConfirmacao, setExibirModalConfirmacao] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [modalExportarOpen, setModalExportarOpen] = useState(false);
+  const [exibirModalConfirmacao, setExibirModalConfirmacao] = useState(false);
 
-const { modoNoturno, toggleModoNoturno } = useTheme(); // Pega o tema do Contexto
+  const [leitorAtivo, setLeitorAtivo] = useState(false);
+  const codeReaderRef = useRef(null);
 
-const [ean, setEan] = useState("");
-const [nomeProduto, setNomeProduto] = useState("");
-const [valorProduto, setValorProduto] = useState("");
-const [quantidadeProduto, setQuantidadeProduto] = useState("");
-const [erro, setErro] = useState("");
-const [editandoIndex, setEditandoIndex] = useState(null);
-const [produtos, setProdutos] = useState(items || []);
-const [isOpen, setIsOpen] = useState(false);
-const [produtoSelecionadoIndex, setProdutoSelecionadoIndex] = useState(null);
+  const toggleMenu = () => setIsMenuOpen((prev) => !prev);
+  const closeMenu = () => setIsMenuOpen(false);
 
-const [currentPage, setCurrentPage] = useState('somar');
-const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const formatarMoeda = (valor) => {
+    return Number(valor || 0).toFixed(2).replace('.', ',');
+  };
 
-// Estados do Scanner
-const [leitorAtivo, setLeitorAtivo] = useState(false);
-const codeReaderRef = useRef(null);
+  const calcularTotalCompra = (lista = produtos) => {
+    return lista.reduce((acc, produto) => acc + Number(produto.total || 0), 0);
+  };
 
-const closeMenu = () => setIsMenuOpen(false);
-const toggleMenu = () => setIsMenuOpen(prev => !prev);
+  const limparCamposModal = () => {
+    setEan('');
+    setNomeProduto('');
+    setValorProduto('');
+    setQuantidadeProduto('');
+    setErro('');
+    setEditandoIndex(null);
 
-const handleLimparLista = () => {
-    if (produtos.length === 0) return;
-    setExibirModalConfirmacao(true); // Abre o modal
-};
+    if (leitorAtivo) {
+      if (codeReaderRef.current) {
+        codeReaderRef.current.reset();
+      }
 
-const confirmarLimpeza = () => {
-    setProdutos([]);
-    setProdutoSelecionadoIndex(null);
-    localStorage.removeItem("produtos");
-    setExibirModalConfirmacao(false); // Fecha o modal
-};
-	
-	// --- Funções de Logout ---
- const handleLogout = () => {
-  console.log("Saindo do sistema...");
-  if (onLogoutSuccess) {
-    onLogoutSuccess(); 
-  } else {
-    alert("Sessão encerrada. (Faltando a função onLogoutSuccess do componente pai)");
-  }
- };
-	
-	const handleNavigation = (pageId) => {
-  closeMenu();
-  
-  if (pageId === 'home') {
-    onGoHome();
-    return;
-  }
-
-  if (pageId === 'themeToggle') {
-    if (onToggleModoNoturno) {
-      onToggleModoNoturno();
-    } else {
-      toggleModoNoturno(); 
+      setLeitorAtivo(false);
     }
-    return;
-  }
+  };
 
-  if (pageId === 'gestor') {
-    if (!isAdmin) {
-      alert("Acesso negado: Você não tem permissão de administrador.");
+  const abrirModalAdicionar = () => {
+    limparCamposModal();
+    setIsOpen(true);
+  };
+
+  const fecharModal = () => {
+    limparCamposModal();
+    setIsOpen(false);
+  };
+
+  const handleLogout = () => {
+    if (onLogoutSuccess) {
+      onLogoutSuccess();
+    } else {
+      alert('Sessão encerrada.');
+    }
+  };
+
+  const handleNavigation = (pageId) => {
+    closeMenu();
+
+    if (pageId === 'home') {
+      onGoHome?.();
       return;
     }
-  }
-
-  setCurrentPage(pageId); 
-};
-
-	
-	// Estrutura de Opções base
-	const baseMenuOptions = [
-  { id: 'home', icon: '🏠', type: 'link', description: 'Voltar para a seleção de modo' },
-  { id: 'gestor', icon: '📦', type: 'link', description: 'Gerenciar códigos de barras' },
-  { id: 'themeToggle', icon: '🌙', type: 'toggleTheme', description: `Tema: ${modoNoturno ? 'Escuro' : 'Claro'}` },
-];
-
-	// FILTRAGEM DO MENU: Aplica a restrição de ADMIN
-	const globalMenuOptions = baseMenuOptions.filter(item => {
-		if (item.id === 'gestor' && !isAdmin) {
-			return false;
-		}
-		return true;
-	});
-
-	// Informações da Conta (Para o rodapé do SidebarMenu)
-	const userAccountInfo = {
-		username: userName, 
-		email: userEmail, 
-		onLogout: handleLogout, 
-		isAdmin: isAdmin, 
-	};
-
-	useEffect(() => {
-		if (items && items.length > 0) {
-			setProdutos(items);
-		} else {
-			const produtosSalvos = localStorage.getItem("produtos");
-			if (produtosSalvos) {
-				setProdutos(JSON.parse(produtosSalvos));
-			}
-		}
-	}, [items]);
-	useEffect(() => {
-		localStorage.setItem("produtos", JSON.stringify(produtos));
-	}, [produtos]);
-	 	
-	const buscarProdutoPorEan = async (codigoEan) => {
-		if (!codigoEan) {
-			setErro("Informe um código EAN válido.");
-			setTimeout(() => setErro(""), 1500);
-			return;
-		}
-	 	
-		try {
-			// 🔹 1️⃣ Tenta buscar no EANData
-			const apiKey = "4210726968ED3C18";
-			const urlEanData = `https://eandata.com/feed/?v=3&keycode=${apiKey}&mode=json&find=${codigoEan}`;
-			const responseEan = await fetch(urlEanData);
-			const dataEan = await responseEan.json();
-
-			// Valida se a resposta tem produto real
-			const produtoValido =
-				dataEan &&
-				dataEan.product &&
-				(dataEan.product.title || dataEan.product.attributes?.product);
-
-			if (produtoValido) {
-				const nome =
-					dataEan.product.attributes?.product ||
-					dataEan.product.title ||
-					"Produto não identificado";
-
-				const preco =
-					dataEan.product.attributes?.price ||
-					dataEan.product.attributes?.msrp ||
-					"";
-
-				setNomeProduto(nome);
-				setValorProduto(preco ? preco.toString() : "0");
-				setErro("");
-				return; // ✅ Encontrado no EANData
-			}
-
-			// 🔹 2️⃣ Caso não tenha encontrado no EANData, tenta no MockAPI
-			const mockApiUrl = "https://68ed848edf2025af780067e3.mockapi.io/gestor/produtos";
-			const responseMock = await fetch(`${mockApiUrl}?ean=${codigoEan}`);
-			const dataMock = await responseMock.json();
-
-			if (Array.isArray(dataMock) && dataMock.length > 0) {
-				const produtoMock = dataMock[0];
-				setNomeProduto(produtoMock.nome);
-				setValorProduto(produtoMock.valor ? produtoMock.valor.toString() : "0");
-				setErro("");
-				return; // ✅ Encontrado no MockAPI
-			}
-
-			// 🔹 3️⃣ Nenhum produto encontrado nas duas fontes
-			setErro("Produto não encontrado.");
-			setNomeProduto("");
-			setValorProduto("");
-			setTimeout(() => setErro(""), 2000);
-
-		} catch (err) {
-			console.error("Erro ao consultar produto:", err);
-			setErro("Erro ao consultar o produto. Tente novamente.");
-			setTimeout(() => setErro(""), 2000);
-		}
-	};
-
-	//  SCANNER EAN
-	useEffect(() => {
-		if (!leitorAtivo) {
-			if (codeReaderRef.current) codeReaderRef.current.reset();
-			return;
-		}
-	 	
-		const initScanner = async () => {
-			try {
-				const codeReader = new BrowserMultiFormatReader();
-				codeReaderRef.current = codeReader;
-
-				// Lista todas as câmeras
-				const devices = await navigator.mediaDevices.enumerateDevices();
-				const videoDevices = devices.filter(d => d.kind === "videoinput");
-
-				console.log("Câmeras detectadas:", videoDevices.map(d => d.label));
-
-				// 🔍 tenta achar câmeras traseiras
-				const backCameras = videoDevices.filter(d =>
-					/back|rear|environment|traseira/i.test(d.label)
-				);
-
-				// 🎯 Se houver mais de uma, tenta a segunda (geralmente a traseira principal)
-				let mainCamera;
-				if (backCameras.length >= 2) {
-					mainCamera = backCameras[1];
-				} else if (backCameras.length === 1) {
-					mainCamera = backCameras[0];
-				} else {
-					// fallback para a primeira câmera se disponível
-					mainCamera = videoDevices.length > 0 ? videoDevices[0] : videoDevices[1];
-				}
-
-				if (!mainCamera) throw new Error("Nenhuma câmera disponível.");
-
-				const constraints = {
-					video: {
-						deviceId: { exact: mainCamera.deviceId },
-						width: { ideal: 1280 },
-						height: { ideal: 720 },
-						advanced: [{ focusMode: "continuous" }]
-					}
-				};
-
-				await codeReader.decodeFromConstraints(constraints, "video", (result, err) => {
-					if (result) {
-						const codigo = result.getText();
-						setEan(codigo);
-						buscarProdutoPorEan(codigo);
-						codeReader.reset();
-						setLeitorAtivo(false);
-					}
-				});
-
-			} catch (err) {
-				console.error("Erro ao acessar a câmera:", err);
-				setErro("Erro ao acessar a câmera. Verifique as permissões ou tente outra câmera.");
-			}
-		};
-
-		initScanner();
-
-		return () => {
-			if (codeReaderRef.current) codeReaderRef.current.reset();
-		};
-	}, [leitorAtivo]);
-
-	const handleAddProduto = () => { 
-		if (!nomeProduto || !valorProduto || !quantidadeProduto) {
-			setErro('Por favor, preencha todos os campos.');
-			setTimeout(() => setErro(""), 1500);
-			return;
-		}
-
-		const novoProduto = {
-			ean: ean || null,
-			nome: nomeProduto,
-			valor: parseFloat(valorProduto),
-			quantidade: parseInt(quantidadeProduto),
-			total: parseFloat(valorProduto) * parseInt(quantidadeProduto),
-		};
-
-		if (editandoIndex !== null) {
-			const produtosAtualizados = produtos.map((produto, index) =>
-				index === editandoIndex ? novoProduto : produto
-			);
-			setProdutos(produtosAtualizados);
-			setEditandoIndex(null);
-		} else {
-			setProdutos([...produtos, novoProduto]);
-		}
-
-		setEan('');
-		setNomeProduto('');
-		setValorProduto('');
-		setQuantidadeProduto('');
-		setErro('');
-		setIsOpen(false);
-		setProdutoSelecionadoIndex(null);
-		setLeitorAtivo(false);
-	};
-
-	const handleEditProduto = (index) => {
-		const produto = produtos[index];
-		setEan(produto.ean || "");
-		setNomeProduto(produto.nome);
-		setValorProduto(produto.valor.toString());
-		setQuantidadeProduto(produto.quantidade.toString());
-		setEditandoIndex(index);
-		setIsOpen(true);
-		setProdutoSelecionadoIndex(null);
-	};
-
-	const handleDeleteProduto = (index) => {
-		setProdutos(produtos.filter((_, i) => i !== index));
-		setProdutoSelecionadoIndex(null);
-	};
-
-	const calcularTotalCompra = () => produtos.reduce((acc, produto) => acc + produto.total, 0);
-
-	const handleRowClick = (index) => {
-		setProdutoSelecionadoIndex(index === produtoSelecionadoIndex ? null : index);
-	};
-
-	// SUBSTITUA SUA FUNÇÃO gerarPDF() POR ESTAS DUAS FUNÇÕES
-
-const exportarExcel = () => {
-	if (produtos.length === 0) {
-		setErro("Não há produtos para exportar.");
-		setTimeout(() => setErro(""), 2000);
-		return;
-	}
-
-	const dados = produtos.map((produto) => ({
-		EAN: produto.ean || "-",
-		Produto: produto.nome,
-		"Valor Unitário": produto.valor,
-		Quantidade: produto.quantidade,
-		Total: produto.total
-	}));
-
-	// adiciona total geral no final
-	dados.push({
-		EAN: "",
-		Produto: "TOTAL GERAL",
-		"Valor Unitário": "",
-		Quantidade: "",
-		Total: calcularTotalCompra()
-	});
-
-	const worksheet = XLSX.utils.json_to_sheet(dados);
-	const workbook = XLSX.utils.book_new();
-
-	XLSX.utils.book_append_sheet(
-		workbook,
-		worksheet,
-		"Lista de Compras"
-	);
-
-	const excelBuffer = XLSX.write(workbook, {
-		bookType: "xlsx",
-		type: "array"
-	});
-
-	const data = new Blob(
-		[excelBuffer],
-		{
-			type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-		}
-	);
-
-	saveAs(data, "lista-compras.xlsx");
-};
-
-
-const exportarPDF = () => {
-	if (produtos.length === 0) {
-		setErro("Não há produtos para exportar.");
-		setTimeout(() => setErro(""), 2000);
-		return;
-	}
-
-	const doc = new jsPDF();
-
-	doc.setFontSize(16);
-	doc.text("Relatório de Gestão de Compras", 14, 15);
-
-	const tableRows = produtos.map((produto) => [
-		produto.ean || "-",
-		produto.nome,
-		`R$ ${produto.valor.toFixed(2)}`,
-		produto.quantidade,
-		`R$ ${produto.total.toFixed(2)}`
-	]);
-
-	autoTable(doc, {
-		head: [["EAN", "Produto", "Valor Unit.", "Qtd", "Total"]],
-		body: tableRows,
-		startY: 25,
-	});
-
-	const finalY = doc.lastAutoTable?.finalY || 30;
-
-	doc.text(
-		`TOTAL GERAL: R$ ${calcularTotalCompra().toFixed(2)}`,
-		14,
-		finalY + 10
-	);
-
-	doc.save("lista-produtos.pdf");
-};
-
-	// -------------------------------------------------------------
-	// RENDERIZAÇÃO
-	// -------------------------------------------------------------
-	return (
-		<div className={`min-h-screen w-full flex ${modoNoturno ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}>
-			 
-			{/* Overlay de fundo para mobile quando o menu está aberto */}
-			{isMenuOpen && (
-				<div 
-					className="fixed inset-0 bg-black opacity-50 z-30 md:hidden"
-					onClick={closeMenu}
-				/>
-			)}
-
-			{/* 1. Menu Lateral (SidebarMenu) */}
-			<SidebarMenu
-				menuItems={globalMenuOptions}
-				accountInfo={userAccountInfo}
-				activeLink="lista"
-				onNavigate={handleNavigation}
-				isMenuOpen={isMenuOpen}
-				onClose={closeMenu}
-			/>
-
-			<main className="flex-grow flex flex-col h-full p-4 sm:p-8 overflow-hidden relative">
-				{/* Header Mobile - Idêntico à TelaInicial */}
-				<header className="md:hidden flex-shrink-0 flex items-center justify-between p-4 fixed top-0 left-0 w-full z-20">
-					<button 
-						onClick={toggleMenu} 
-						className={`p-2 rounded-lg text-2xl ${modoNoturno ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
-					> ☰ </button>
-					<div>
-						<h1 className="text-2xl sm:text-4xl font-extrabold">Lista de Compra 🛒</h1>
-						<p className="opacity-60 text-xs font-bold uppercase tracking-widest">Somar valor</p>
-						</div>
-					<div className="w-8"></div>
-				</header>
-
-				{/* Conteúdo da tela SomarValor - ENGLOBA TODOS OS ELEMENTOS DA TELA PRINCIPAL */}
-				<div className="container mx-auto max-w-4xl pt-12 md:pt-0 flex-grow">
-					<h1 className="py-4 p-8 text-center text-4xl font-extrabold hidden md:block">Sua Lista de Compras 🛒</h1>
-
-					{/* Lista de produtos */}
-					<div className={`p-4 mt-4 rounded-xl shadow-lg border ${modoNoturno ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-						<div className="overflow-y-scroll min-h-44 max-h-96">
-							{produtos.length === 0 ? (
-								<div className="text-center py-10">
-									<p className="font-semibold text-lg mb-2">Sua lista de compras está vazia. 📝</p>
-									<p>Clique em <b>'+ Adicionar Produto'</b> para começar!</p>
-								</div>
-							) : (
-								<div>
-										{/* Títulos da Tabela (Desktop) */}
-										<div className="hidden sm:flex w-full font-bold border-b-2 dark:border-gray-600">
-											<div className={`px-4 py-3 text-left ${COL_NOME}`}>Nome</div>
-											<div className={`px-4 py-3 text-right ${COL_VALOR}`}>Valor Und.</div>
-											<div className={`px-4 py-3 text-center ${COL_QTD}`}>Qtd.</div>
-											<div className={`px-4 py-3 text-right ${COL_TOTAL}`}>Total Item</div>
-										</div>
-									{produtos.map((produto, index) => (
-										<div key={index} onClick={() => handleRowClick(index)}
-											className={`flex flex-col sm:flex-row border-b dark:border-gray-700 transition duration-100 cursor-pointer w-full relative
-											${index === produtoSelecionadoIndex ? 'bg-blue-100/50 dark:bg-blue-900/70' : (index % 2 === 0 ? ' ' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50')}`}>
-											{/* Mobile layout */}
-											<div className={`p-4 sm:hidden w-full`}>
-												<div className="font-extrabold text-lg mb-2">{produto.nome}</div>
-												<div className="grid grid-cols-3 gap-y-1 gap-x-4 text-sm">
-													<div className="flex flex-col">
-														<span className="font-semibold text-gray-400">Valor Und.:</span>
-														<span className="font-medium">R$ {produto.valor.toFixed(2)}</span>
-													</div>
-													<div className="flex flex-col text-center">
-														<span className="font-semibold text-gray-400">Qtd.:</span>
-														<span className="font-medium">{produto.quantidade}</span>
-													</div>
-													<div className="flex flex-col items-end">
-														<span className="font-semibold text-gray-400">Total Item:</span>
-														<span className="text-lg font-bold text-green-500">R$ {produto.total.toFixed(2)}</span>
-													</div>
-												</div>
-											</div>
-											{/* Desktop layout */}
-											<div className="hidden sm:flex w-full">
-												<div className={`px-4 py-3 text-left flex items-center ${COL_NOME}`}>{produto.nome}</div>
-												<div className={`px-4 py-3 text-right flex items-center justify-end ${COL_VALOR}`}>R$ {produto.valor.toFixed(2)}</div>
-												<div className={`px-4 py-3 text-center flex items-center justify-center ${COL_QTD}`}>{produto.quantidade}</div>
-												<div className={`px-4 py-3 font-semibold text-right flex items-center justify-end ${COL_TOTAL} text-lg text-green-600 dark:text-green-400`}>R$ {produto.total.toFixed(2)}</div>
-											</div>
-
-											{index === produtoSelecionadoIndex && (
-												<div className="absolute top-1/2 right-4 transform -translate-y-1/2 flex gap-2 z-20 p-4 rounded-lg bg-white/70 backdrop-blur-sm dark:bg-gray-900/70 shadow-md">
-													<button 
-													onClick={(e) => { e.stopPropagation(); handleEditProduto(index); }} 
-													className="p-2 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition" title="Editar">
-														<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-															<path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
-															<path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
-														</svg>
-													</button>
-													<button onClick={(e) => { e.stopPropagation(); handleDeleteProduto(index); }}className="p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition" title="Excluir">
-														<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-															<path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-														</svg>
-													</button>
-												</div>
-											)}
-										</div>
-									))}
-								</div>
-							)}
-						</div>
-
-					</div>
-
-					{produtos.length > 0 && (
-						<div className="border-t-4 mt-4 border-green-500 font-bold p-4 text-right text-2xl text-green-600 dark:text-green-400">
-							Total: R$ {calcularTotalCompra().toFixed(2)}
-						</div>
-					)}
-					
-					{/* BOTÕES DE CONTROLE - DENTRO DO CONTAINER PRINCIPAL */}
-					<div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 gap-2 mt-4 w-full">
-						<button
-							onClick={() => {
-								setIsOpen(true);
-								setEditandoIndex(null);
-							}}
-							className="w-full h-12 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold flex items-center justify-center"
-						>
-							+ Adicionar Produto
-						</button>
-
-						{produtos.length > 0 && (
-							<>
-							<button
-									onClick={handleLimparLista}
-									className="w-full h-12 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold flex items-center justify-center"
-								>
-									Limpar Lista
-								</button>
-								<button
-									onClick={() => setModalExportarOpen(true)}
-									 className="w-full h-12 col-span-2 bg-gray-700 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center"
-								>
-									Exportar
-								</button>
-							</>
-						)}
-
-					</div>
-				</div>
-				{/* Modal de Confirmação */}
-				{exibirModalConfirmacao && (
-					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-						<div className={`w-full max-w-sm p-6 rounded-2xl shadow-2xl transform transition-all ${modoNoturno ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}`}>
-							<div className="text-center">
-								<div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
-									<svg className="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-									</svg>
-								</div>
-								<h3 className="text-xl font-bold mb-2">Apagar Lista?</h3>
-								<p className="text-sm opacity-80 mb-6">
-									Esta ação não pode ser desfeita. Todos os itens serão removidos permanentemente.
-								</p>
-							</div>
-
-							<div className="flex gap-3">
-								<button
-									onClick={confirmarLimpeza}
-									className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold shadow-lg shadow-red-600/20 transition"
-								>
-									Sim, Apagar
-								</button>
-								<button
-									onClick={() => setExibirModalConfirmacao(false)}
-									className={`flex-1 py-3 px-4 rounded-xl font-semibold transition ${modoNoturno ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'}`}
-								>
-									Cancelar
-								</button>
-							</div>
-						</div>
-					</div>
-				)}
-
-				{/* Modal de Exportação */}
-				{modalExportarOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                        <div
-                            className={`w-full max-w-md p-6 rounded-2xl shadow-2xl ${
-                                modoNoturno
-                                    ? 'bg-gray-800 text-white'
-                                    : 'bg-white text-gray-800'
-                            }`}
-                        >
-                            <h2 className="text-xl font-bold text-center mb-6">
-                                Escolha o formato de exportação
-                            </h2>
-
-                            <div className="flex h-full gap-3">
-                                <button
-                                    onClick={() => {
-                                        exportarExcel();
-                                        setModalExportarOpen(false);
-                                    }}
-                                    className="w-full h-16 bg-gray-700 text-white rounded-xl hover:bg-green-700 transition font-semibold"
-                                >
-                                    Exportar em Excel
-                                </button>
-
-                                <button
-                                    onClick={() => {
-                                        exportarPDF();
-                                        setModalExportarOpen(false);
-                                    }}
-                                    className="w-full h-16 bg-gray-700 text-white rounded-xl hover:bg-purple-700 transition font-semibold"
-                                >
-                                    Exportar em PDF
-                                </button>
-							</div>
-							<div className="flex mt-4 gap-3">
-                                <button
-                                    onClick={() => setModalExportarOpen(false)}
-                                    className={`w-full h-12 rounded-xl font-semibold transition ${
-                                        modoNoturno
-                                            ? 'bg-red-700 hover:bg-gray-600'
-                                            : 'bg-gray-100 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    Cancelar
-                                </button>
-                            </div>
-                        </div>
+
+    if (pageId === 'themeToggle') {
+      if (onToggleModoNoturno) {
+        onToggleModoNoturno();
+      } else {
+        toggleModoNoturno();
+      }
+
+      return;
+    }
+
+    if (pageId === 'gestor') {
+      if (!isAdmin) {
+        alert('Acesso negado: Você não tem permissão de administrador.');
+        return;
+      }
+
+      onSelectOption?.('gestor', '');
+      return;
+    }
+  };
+
+  const baseMenuOptions = [
+    {
+      id: 'home',
+      icon: '🏠',
+      type: 'link',
+      label: 'Início',
+      description: 'Voltar para o início',
+    },
+    {
+      id: 'gestor',
+      icon: '📦',
+      type: 'link',
+      label: 'Gestor',
+      description: 'Gerenciar produtos',
+    },
+    {
+      id: 'themeToggle',
+      icon: modoNoturno ? '☀️' : '🌙',
+      type: 'toggleTheme',
+      label: 'Tema',
+      description: `Tema: ${modoNoturno ? 'Escuro' : 'Claro'}`,
+    },
+  ];
+
+  const globalMenuOptions = baseMenuOptions.filter((item) => {
+    if (item.id === 'gestor' && !isAdmin) return false;
+    return true;
+  });
+
+  const userAccountInfo = {
+    username: userName,
+    email: userEmail,
+    onLogout: handleLogout,
+    isAdmin,
+  };
+
+  useEffect(() => {
+    if (items && items.length > 0) {
+      const itensConvertidos = items.map((item) => ({
+        ean: item.ean || null,
+        nome: item.nome,
+        valor: Number(item.valor || 0),
+        quantidade: Number(item.quantidade || 1),
+        total: Number(item.total || Number(item.valor || 0) * Number(item.quantidade || 1)),
+      }));
+
+      setProdutos(itensConvertidos);
+      return;
+    }
+
+    const produtosSalvos = localStorage.getItem('produtos');
+
+    if (produtosSalvos) {
+      try {
+        setProdutos(JSON.parse(produtosSalvos));
+      } catch (error) {
+        console.error('Erro ao carregar produtos salvos:', error);
+        setProdutos([]);
+      }
+    }
+  }, [items]);
+
+  useEffect(() => {
+    localStorage.setItem('produtos', JSON.stringify(produtos));
+  }, [produtos]);
+
+  const buscarProdutoPorEan = async (codigoEan) => {
+    if (!codigoEan) {
+      setErro('Informe um código EAN válido.');
+      setTimeout(() => setErro(''), 1500);
+      return;
+    }
+
+    setErro('');
+
+    try {
+      const apiKey = '4210726968ED3C18';
+      const urlEanData = `https://eandata.com/feed/?v=3&keycode=${apiKey}&mode=json&find=${codigoEan}`;
+
+      const responseEan = await fetch(urlEanData);
+      const dataEan = await responseEan.json();
+
+      const produtoValido =
+        dataEan &&
+        dataEan.product &&
+        (dataEan.product.title || dataEan.product.attributes?.product);
+
+      if (produtoValido) {
+        const nome =
+          dataEan.product.attributes?.product ||
+          dataEan.product.title ||
+          'Produto não identificado';
+
+        const preco =
+          dataEan.product.attributes?.price ||
+          dataEan.product.attributes?.msrp ||
+          '';
+
+        setNomeProduto(nome);
+        setValorProduto(preco ? preco.toString() : '0');
+        setErro('');
+        return;
+      }
+
+      const mockApiUrl = 'https://68ed848edf2025af780067e3.mockapi.io/gestor/produtos';
+      const responseMock = await fetch(`${mockApiUrl}?ean=${codigoEan}`);
+      const dataMock = await responseMock.json();
+
+      if (Array.isArray(dataMock) && dataMock.length > 0) {
+        const produtoMock = dataMock[0];
+
+        setNomeProduto(produtoMock.nome);
+        setValorProduto(produtoMock.valor ? produtoMock.valor.toString() : '0');
+        setErro('');
+        return;
+      }
+
+      setErro('Produto não encontrado. Preencha manualmente.');
+      setNomeProduto('');
+      setValorProduto('');
+
+      setTimeout(() => setErro(''), 3000);
+    } catch (err) {
+      console.error('Erro ao consultar produto:', err);
+      setErro('Erro ao consultar o produto. Tente novamente.');
+      setTimeout(() => setErro(''), 3000);
+    }
+  };
+
+  useEffect(() => {
+    if (!leitorAtivo) {
+      if (codeReaderRef.current) {
+        codeReaderRef.current.reset();
+      }
+
+      return;
+    }
+
+    const initScanner = async () => {
+      try {
+        if (!codeReaderRef.current) {
+          codeReaderRef.current = new BrowserMultiFormatReader();
+        }
+
+        const codeReader = codeReaderRef.current;
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter((device) => device.kind === 'videoinput');
+
+        const backCameras = videoDevices.filter((device) =>
+          /back|rear|environment|traseira/i.test(device.label)
+        );
+
+        let mainCamera = null;
+
+        if (backCameras.length >= 2) {
+          mainCamera = backCameras[1];
+        } else if (backCameras.length === 1) {
+          mainCamera = backCameras[0];
+        } else {
+          mainCamera = videoDevices.length > 0 ? videoDevices[0] : null;
+        }
+
+        if (!mainCamera && videoDevices.length > 1) {
+          mainCamera = videoDevices[1];
+        }
+
+        if (!mainCamera) {
+          throw new Error('Nenhuma câmera disponível.');
+        }
+
+        const constraints = {
+          video: {
+            deviceId: { exact: mainCamera.deviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            advanced: [{ focusMode: 'continuous' }],
+          },
+        };
+
+        await codeReader.decodeFromConstraints(
+          constraints,
+          'video-scanner-somar',
+          (result, err) => {
+            if (result) {
+              const codigo = result.getText();
+
+              setEan(codigo);
+              buscarProdutoPorEan(codigo);
+
+              if (codeReaderRef.current) {
+                codeReaderRef.current.reset();
+              }
+
+              setLeitorAtivo(false);
+            }
+
+            if (err && !(err instanceof NotFoundException)) {
+              console.error('Erro durante a leitura:', err);
+            }
+          }
+        );
+      } catch (err) {
+        console.error('Erro ao acessar a câmera:', err);
+        setErro('Erro ao acessar a câmera. Verifique as permissões ou tente outra câmera.');
+        setTimeout(() => setErro(''), 3000);
+        setLeitorAtivo(false);
+      }
+    };
+
+    initScanner();
+
+    return () => {
+      if (codeReaderRef.current) {
+        codeReaderRef.current.reset();
+      }
+    };
+  }, [leitorAtivo]);
+
+  const handleAddProduto = () => {
+    if (!nomeProduto || !valorProduto || !quantidadeProduto) {
+      setErro('Por favor, preencha todos os campos.');
+      setTimeout(() => setErro(''), 2000);
+      return;
+    }
+
+    const valorNumerico = parseFloat(String(valorProduto).replace(',', '.'));
+    const quantidadeNumerica = parseInt(quantidadeProduto);
+
+    if (
+      isNaN(valorNumerico) ||
+      isNaN(quantidadeNumerica) ||
+      valorNumerico <= 0 ||
+      quantidadeNumerica <= 0
+    ) {
+      setErro('Valor e quantidade devem ser números positivos válidos.');
+      setTimeout(() => setErro(''), 2500);
+      return;
+    }
+
+    const novoProduto = {
+      ean: ean || null,
+      nome: nomeProduto.trim(),
+      valor: valorNumerico,
+      quantidade: quantidadeNumerica,
+      total: valorNumerico * quantidadeNumerica,
+    };
+
+    if (editandoIndex !== null) {
+      const produtosAtualizados = produtos.map((produto, index) =>
+        index === editandoIndex ? novoProduto : produto
+      );
+
+      setProdutos(produtosAtualizados);
+    } else {
+      setProdutos([novoProduto, ...produtos]);
+    }
+
+    limparCamposModal();
+    setIsOpen(false);
+    setProdutoSelecionadoIndex(null);
+  };
+
+  const handleEditProduto = (index) => {
+    const produto = produtos[index];
+
+    setEan(produto.ean || '');
+    setNomeProduto(produto.nome);
+    setValorProduto(produto.valor.toString());
+    setQuantidadeProduto(produto.quantidade.toString());
+    setEditandoIndex(index);
+    setProdutoSelecionadoIndex(null);
+    setIsOpen(true);
+  };
+
+  const handleDeleteProduto = (index) => {
+    setProdutos(produtos.filter((_, i) => i !== index));
+    setProdutoSelecionadoIndex(null);
+  };
+
+  const handleRowClick = (index) => {
+    setProdutoSelecionadoIndex(index === produtoSelecionadoIndex ? null : index);
+  };
+
+  const handleLimparLista = () => {
+    if (produtos.length === 0) return;
+    setExibirModalConfirmacao(true);
+  };
+
+  const confirmarLimpeza = () => {
+    setProdutos([]);
+    setProdutoSelecionadoIndex(null);
+    localStorage.removeItem('produtos');
+    setExibirModalConfirmacao(false);
+  };
+
+  const exportarExcel = () => {
+    if (produtos.length === 0) {
+      setErro('Não há produtos para exportar.');
+      setTimeout(() => setErro(''), 2000);
+      return;
+    }
+
+    const dados = produtos.map((produto) => ({
+      EAN: produto.ean || '-',
+      Produto: produto.nome,
+      'Valor Unitário': produto.valor,
+      Quantidade: produto.quantidade,
+      Total: produto.total,
+    }));
+
+    dados.push({
+      EAN: '',
+      Produto: 'TOTAL GERAL',
+      'Valor Unitário': '',
+      Quantidade: '',
+      Total: calcularTotalCompra(),
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dados);
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Lista de Compras');
+
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: 'xlsx',
+      type: 'array',
+    });
+
+    const data = new Blob([excelBuffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+
+    saveAs(data, 'lista-compras.xlsx');
+  };
+
+  const exportarPDF = () => {
+    if (produtos.length === 0) {
+      setErro('Não há produtos para exportar.');
+      setTimeout(() => setErro(''), 2000);
+      return;
+    }
+
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.text('Relatório de Gestão de Compras', 14, 15);
+
+    const tableRows = produtos.map((produto) => [
+      produto.ean || '-',
+      produto.nome,
+      `R$ ${formatarMoeda(produto.valor)}`,
+      produto.quantidade,
+      `R$ ${formatarMoeda(produto.total)}`,
+    ]);
+
+    autoTable(doc, {
+      head: [['EAN', 'Produto', 'Valor Unit.', 'Qtd', 'Total']],
+      body: tableRows,
+      startY: 25,
+    });
+
+    const finalY = doc.lastAutoTable?.finalY || 30;
+
+    doc.text(
+      `TOTAL GERAL: R$ ${formatarMoeda(calcularTotalCompra())}`,
+      14,
+      finalY + 10
+    );
+
+    doc.save('lista-produtos.pdf');
+  };
+
+  const containerBase = modoNoturno
+    ? 'bg-gray-900 text-gray-100'
+    : 'bg-gray-100 text-gray-900';
+
+  const cardBase = modoNoturno
+    ? 'bg-gray-800 border-gray-700'
+    : 'bg-white border-gray-200';
+
+  const inputBase = modoNoturno
+    ? 'bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/20'
+    : 'bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500/20';
+
+  return (
+    <div className={`h-screen w-full flex overflow-hidden ${containerBase}`}>
+      {isMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-30 md:hidden"
+          onClick={closeMenu}
+        />
+      )}
+
+      <SidebarMenu
+        menuItems={globalMenuOptions}
+        accountInfo={userAccountInfo}
+        activeLink="somar"
+        onNavigate={handleNavigation}
+        isMenuOpen={isMenuOpen}
+        onClose={closeMenu}
+      />
+
+      <main className="flex-1 h-screen flex flex-col overflow-hidden">
+        <header
+          className={`
+            md:hidden flex-shrink-0 flex items-center justify-between px-3 py-2.5 z-20 shadow-sm border-b
+            ${modoNoturno ? 'bg-gray-900 border-gray-800' : 'bg-gray-100 border-gray-200'}
+          `}
+        >
+          <button
+            onClick={toggleMenu}
+            className={`
+              w-10 h-10 rounded-2xl text-2xl flex items-center justify-center shadow-sm
+              ${modoNoturno ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}
+            `}
+          >
+            ☰
+          </button>
+
+          <div className="text-center">
+            <h1 className="text-base font-black leading-tight">Lista de Compra</h1>
+            <p
+              className={`text-[9px] font-bold uppercase tracking-[0.18em] ${
+                modoNoturno ? 'text-gray-400' : 'text-gray-500'
+              }`}
+            >
+              Somar valor
+            </p>
+          </div>
+
+          <div className="w-10" />
+        </header>
+
+        <div className="flex-1 min-h-0 overflow-hidden p-2 sm:p-5 lg:p-6">
+          <div className="max-w-5xl mx-auto h-full flex flex-col min-h-0 overflow-hidden">
+            {erro && !isOpen && (
+              <div className="flex-shrink-0 p-3 mb-3 text-center rounded-xl bg-red-100 border border-red-400 text-red-800 dark:bg-red-900/50 dark:border-red-600 dark:text-red-300 font-black shadow-sm text-sm">
+                {erro}
+              </div>
+            )}
+
+            <div
+              className={`
+                hidden md:flex flex-shrink-0 rounded-2xl border shadow-sm px-5 py-4 mb-4 items-center justify-between gap-6
+                ${cardBase}
+              `}
+            >
+              <div>
+                <span
+                  className={`
+                    inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-black mb-2
+                    ${
+                      modoNoturno
+                        ? 'bg-blue-500/15 text-blue-300'
+                        : 'bg-blue-50 text-blue-700'
+                    }
+                  `}
+                >
+                  🧮 Modo soma
+                </span>
+
+                <h1 className="text-2xl lg:text-3xl font-black tracking-tight">
+                  Sua lista de compras
+                </h1>
+
+                <p
+                  className={`mt-1 max-w-2xl text-sm ${
+                    modoNoturno ? 'text-gray-300' : 'text-gray-600'
+                  }`}
+                >
+                  Adicione os produtos comprados e acompanhe o total em tempo real.
+                </p>
+              </div>
+
+              <button
+                onClick={abrirModalAdicionar}
+                className="
+                  px-6 py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white
+                  text-base font-black shadow-lg shadow-blue-600/20 transition-all active:scale-95
+                  flex items-center justify-center gap-2 whitespace-nowrap
+                "
+              >
+                <span className="text-xl">+</span>
+                <span>Adicionar produto</span>
+              </button>
+            </div>
+
+            <section
+              className={`
+                flex-1 min-h-0 rounded-2xl sm:rounded-3xl border-2 shadow-xl overflow-hidden flex flex-col
+                ${
+                  modoNoturno
+                    ? 'bg-gray-800 border-blue-500/40 shadow-blue-950/30'
+                    : 'bg-white border-blue-200 shadow-blue-100/80'
+                }
+              `}
+            >
+              <div
+                className={`
+                  flex-shrink-0 px-3 py-3 sm:px-4 sm:py-4 border-b
+                  ${
+                    modoNoturno
+                      ? 'border-blue-500/30 bg-gradient-to-r from-blue-950/60 via-gray-900/70 to-gray-900'
+                      : 'border-blue-100 bg-gradient-to-r from-blue-50 via-white to-green-50'
+                  }
+                `}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-xl sm:text-2xl shadow-lg flex-shrink-0">
+                      🛒
                     </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-lg sm:text-xl font-black leading-tight">
+                          Produtos da compra
+                        </h2>
+
+                        <span
+                          className={`
+                            px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black
+                            ${
+                              modoNoturno
+                                ? 'bg-blue-500/20 text-blue-300'
+                                : 'bg-blue-100 text-blue-700'
+                            }
+                          `}
+                        >
+                          {produtos.length} produto(s)
+                        </span>
+                      </div>
+
+                      <p
+                        className={`text-xs sm:text-sm mt-0.5 line-clamp-1 ${
+                          modoNoturno ? 'text-gray-300' : 'text-gray-600'
+                        }`}
+                      >
+                        {produtos.length === 0
+                          ? 'Adicione produtos para iniciar a soma.'
+                          : 'Toque em um produto para editar ou excluir.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {produtos.length > 0 && (
+                      <button
+                        onClick={handleLimparLista}
+                        className="
+                          hidden sm:inline-flex px-3 py-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white
+                          text-xs font-black transition-all
+                        "
+                      >
+                        Limpar
+                      </button>
+                    )}
+
+                    <button
+                      onClick={abrirModalAdicionar}
+                      className="
+                        px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white
+                        text-xs sm:text-sm font-black transition-all active:scale-95 shadow-md shadow-blue-600/20
+                        flex items-center justify-center gap-1.5
+                      "
+                    >
+                      <span className="text-base leading-none">+</span>
+                      <span>Adicionar</span>
+                    </button>
+
+                    {produtos.length > 0 && (
+                      <button
+                        onClick={() => setModalExportarOpen(true)}
+                        className="
+                          hidden sm:inline-flex px-3 py-2.5 rounded-xl bg-gray-700 hover:bg-green-700 text-white
+                          text-xs font-black transition-all active:scale-95
+                        "
+                      >
+                        Exportar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-scrollbar p-2 sm:p-4">
+                {produtos.length === 0 ? (
+                  <div
+                    className={`
+                      h-full min-h-[260px] flex flex-col items-center justify-center text-center px-6 py-8 rounded-2xl border-2 border-dashed
+                      ${
+                        modoNoturno
+                          ? 'border-gray-700 bg-gray-900/60'
+                          : 'border-blue-100 bg-blue-50/50'
+                      }
+                    `}
+                  >
+                    <div
+                      className={`
+                        w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex items-center justify-center text-4xl sm:text-5xl mb-4 shadow-sm
+                        ${modoNoturno ? 'bg-gray-800' : 'bg-white'}
+                      `}
+                    >
+                      🛒
+                    </div>
+
+                    <h3 className="text-lg sm:text-xl font-black">
+                      Sua lista está vazia
+                    </h3>
+
+                    <p
+                      className={`mt-2 max-w-sm text-xs sm:text-sm ${
+                        modoNoturno ? 'text-gray-400' : 'text-gray-600'
+                      }`}
+                    >
+                      Toque em <strong>Adicionar</strong> para incluir o primeiro produto.
+                    </p>
+
+                    <button
+                      onClick={abrirModalAdicionar}
+                      className="
+                        mt-5 px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white
+                        font-black transition-all active:scale-95 shadow-lg shadow-blue-600/20
+                      "
+                    >
+                      + Adicionar primeiro produto
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2 sm:space-y-3">
+                    <div
+                      className={`
+                        hidden md:grid grid-cols-12 gap-3 px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-wide
+                        ${modoNoturno ? 'bg-gray-900 text-gray-400' : 'bg-gray-100 text-gray-500'}
+                      `}
+                    >
+                      <div className="col-span-5">Produto</div>
+                      <div className="col-span-2 text-right">Valor und.</div>
+                      <div className="col-span-2 text-center">Qtd.</div>
+                      <div className="col-span-3 text-right">Total</div>
+                    </div>
+
+                    {produtos.map((produto, index) => {
+                      const selecionado = index === produtoSelecionadoIndex;
+
+                      return (
+                        <div
+                          key={`${produto.nome}-${index}`}
+                          onClick={() => handleRowClick(index)}
+                          className={`
+                            relative cursor-pointer rounded-2xl border transition-all overflow-hidden
+                            ${
+                              selecionado
+                                ? modoNoturno
+                                  ? 'bg-blue-900/50 border-blue-400 shadow-lg shadow-blue-950/30'
+                                  : 'bg-blue-50 border-blue-400 shadow-lg shadow-blue-100'
+                                : modoNoturno
+                                  ? 'bg-gray-900 border-gray-700 hover:border-blue-500 hover:bg-gray-900/80'
+                                  : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-md'
+                            }
+                          `}
+                        >
+                          <div
+                            className={`
+                              absolute left-0 top-0 h-full w-1.5
+                              ${selecionado ? 'bg-blue-600' : index % 2 === 0 ? 'bg-green-500' : 'bg-blue-500'}
+                            `}
+                          />
+
+                          <div className="hidden md:grid grid-cols-12 gap-3 items-center px-5 py-4">
+                            <div className="col-span-5 min-w-0 pl-2">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div
+                                  className={`
+                                    w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm flex-shrink-0
+                                    ${
+                                      modoNoturno
+                                        ? 'bg-gray-800 text-blue-300'
+                                        : 'bg-blue-50 text-blue-700'
+                                    }
+                                  `}
+                                >
+                                  {index + 1}
+                                </div>
+
+                                <div className="min-w-0">
+                                  <p className="font-black truncate">{produto.nome}</p>
+
+                                  {produto.ean && (
+                                    <p
+                                      className={`text-[11px] mt-0.5 ${
+                                        modoNoturno ? 'text-gray-400' : 'text-gray-500'
+                                      }`}
+                                    >
+                                      EAN: {produto.ean}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="col-span-2 text-right font-bold">
+                              R$ {formatarMoeda(produto.valor)}
+                            </div>
+
+                            <div className="col-span-2 text-center">
+                              <span
+                                className={`
+                                  inline-flex min-w-10 justify-center px-3 py-1 rounded-full font-black
+                                  ${
+                                    modoNoturno
+                                      ? 'bg-gray-800 text-gray-100'
+                                      : 'bg-gray-100 text-gray-800'
+                                  }
+                                `}
+                              >
+                                {produto.quantidade}
+                              </span>
+                            </div>
+
+                            <div className="col-span-3 text-right text-lg font-black text-green-500">
+                              R$ {formatarMoeda(produto.total)}
+                            </div>
+                          </div>
+
+                          <div className="md:hidden p-3 pl-5">
+                            <div className="flex items-start gap-2 mb-2">
+                              <div
+                                className={`
+                                  w-9 h-9 rounded-xl flex items-center justify-center font-black flex-shrink-0 text-sm
+                                  ${
+                                    modoNoturno
+                                      ? 'bg-gray-800 text-blue-300'
+                                      : 'bg-blue-50 text-blue-700'
+                                  }
+                                `}
+                              >
+                                {index + 1}
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="font-black text-base leading-tight truncate">
+                                  {produto.nome}
+                                </div>
+
+                                {produto.ean && (
+                                  <p
+                                    className={`text-[10px] mt-0.5 truncate ${
+                                      modoNoturno ? 'text-gray-400' : 'text-gray-500'
+                                    }`}
+                                  >
+                                    EAN: {produto.ean}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-[10px] text-gray-400 leading-none">Total</p>
+                                <p className="font-black text-green-500 text-sm">
+                                  R$ {formatarMoeda(produto.total)}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div
+                                className={`rounded-xl px-2 py-1.5 ${
+                                  modoNoturno ? 'bg-gray-800' : 'bg-gray-50'
+                                }`}
+                              >
+                                <p className={modoNoturno ? 'text-gray-400' : 'text-gray-500'}>
+                                  Valor
+                                </p>
+                                <p className="font-black">
+                                  R$ {formatarMoeda(produto.valor)}
+                                </p>
+                              </div>
+
+                              <div
+                                className={`rounded-xl px-2 py-1.5 text-center ${
+                                  modoNoturno ? 'bg-gray-800' : 'bg-gray-50'
+                                }`}
+                              >
+                                <p className={modoNoturno ? 'text-gray-400' : 'text-gray-500'}>
+                                  Qtd.
+                                </p>
+                                <p className="font-black">{produto.quantidade}</p>
+                              </div>
+                            </div>
+
+                            {selecionado && (
+                              <div className="grid grid-cols-2 gap-2 mt-3">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditProduto(index);
+                                  }}
+                                  className="h-10 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black transition flex items-center justify-center"
+                                >
+                                  ✎ Editar
+                                </button>
+
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteProduto(index);
+                                  }}
+                                  className="h-10 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black transition flex items-center justify-center"
+                                >
+                                  🗑 Excluir
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          {selecionado && (
+                            <div
+                              className={`
+                                hidden md:flex absolute top-1/2 right-4 -translate-y-1/2 gap-2 z-20 p-2 rounded-xl shadow-lg backdrop-blur-sm
+                                ${modoNoturno ? 'bg-gray-950/90' : 'bg-white/90'}
+                              `}
+                            >
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditProduto(index);
+                                }}
+                                className="w-9 h-9 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-black transition flex items-center justify-center"
+                                title="Editar"
+                              >
+                                ✎
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteProduto(index);
+                                }}
+                                className="w-9 h-9 rounded-lg bg-red-600 hover:bg-red-700 text-white font-black transition flex items-center justify-center"
+                                title="Excluir"
+                              >
+                                🗑
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    <div className="h-1" />
+                  </div>
+                )}
+              </div>
+
+              {produtos.length > 0 && (
+                <div
+                  className={`
+                    flex-shrink-0 border-t px-3 py-2.5 sm:px-4 sm:py-3
+                    ${
+                      modoNoturno
+                        ? 'border-blue-500/30 bg-gray-950/80'
+                        : 'border-blue-100 bg-gradient-to-r from-blue-50 to-green-50'
+                    }
+                  `}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p
+                        className={`text-[10px] sm:text-[11px] font-black uppercase tracking-wide ${
+                          modoNoturno ? 'text-gray-400' : 'text-gray-500'
+                        }`}
+                      >
+                        Total da compra
+                      </p>
+
+                      <p className="text-xl sm:text-2xl font-black text-green-500">
+                        R$ {formatarMoeda(calcularTotalCompra())}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setModalExportarOpen(true)}
+                        className="sm:hidden px-4 py-2.5 rounded-xl bg-gray-700 hover:bg-green-700 text-white text-xs font-black transition"
+                      >
+                        Exportar
+                      </button>
+
+                      <button
+                        onClick={handleLimparLista}
+                        className="sm:hidden px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black transition"
+                      >
+                        Limpar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+
+        {exibirModalConfirmacao && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <div
+              className={`
+                w-full max-w-sm rounded-[2rem] border shadow-2xl p-7 text-center
+                ${modoNoturno ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}
+              `}
+            >
+              <div className="w-20 h-20 mx-auto rounded-3xl bg-red-500 text-white flex items-center justify-center text-4xl mb-5 shadow-lg">
+                ⚠️
+              </div>
+
+              <h3 className="text-2xl font-black">Apagar lista?</h3>
+
+              <p
+                className={`mt-2 text-sm ${
+                  modoNoturno ? 'text-gray-300' : 'text-gray-600'
+                }`}
+              >
+                Esta ação não pode ser desfeita. Todos os itens serão removidos.
+              </p>
+
+              <div className="grid gap-3 mt-7">
+                <button
+                  onClick={confirmarLimpeza}
+                  className="p-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black transition-all active:scale-95"
+                >
+                  Sim, apagar
+                </button>
+
+                <button
+                  onClick={() => setExibirModalConfirmacao(false)}
+                  className={`
+                    p-4 rounded-2xl font-black transition-all
+                    ${
+                      modoNoturno
+                        ? 'bg-gray-900 hover:bg-gray-700 text-gray-300'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }
+                  `}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {modalExportarOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <div
+              className={`
+                w-full max-w-md rounded-[2rem] border shadow-2xl p-7
+                ${modoNoturno ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-800'}
+              `}
+            >
+              <div className="text-center mb-6">
+                <div className="w-20 h-20 mx-auto rounded-3xl bg-green-600 text-white flex items-center justify-center text-4xl mb-5 shadow-lg">
+                  📄
+                </div>
+
+                <h2 className="text-2xl font-black">Exportar relatório</h2>
+
+                <p
+                  className={`text-sm mt-2 ${
+                    modoNoturno ? 'text-gray-300' : 'text-gray-600'
+                  }`}
+                >
+                  Escolha o formato para salvar sua lista de compras.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    exportarExcel();
+                    setModalExportarOpen(false);
+                  }}
+                  className="h-16 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition font-black"
+                >
+                  Excel
+                </button>
+
+                <button
+                  onClick={() => {
+                    exportarPDF();
+                    setModalExportarOpen(false);
+                  }}
+                  className="h-16 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 transition font-black"
+                >
+                  PDF
+                </button>
+              </div>
+
+              <button
+                onClick={() => setModalExportarOpen(false)}
+                className={`
+                  w-full h-12 rounded-2xl font-black transition mt-4
+                  ${
+                    modoNoturno
+                      ? 'bg-gray-900 hover:bg-gray-700 text-gray-300'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }
+                `}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isOpen && (
+          <div
+            className={`
+              fixed inset-0 z-50 flex justify-center items-center p-3 sm:p-4 transition-all
+              ${modoNoturno ? 'bg-gray-900/90 text-gray-100' : 'bg-black/70 text-gray-900'}
+            `}
+          >
+            <div
+              className={`
+                w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-[2rem] shadow-2xl border
+                ${modoNoturno ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}
+              `}
+            >
+              <div
+                className={`
+                  px-5 sm:px-6 py-5 border-b
+                  ${modoNoturno ? 'border-gray-700' : 'border-gray-200'}
+                `}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h1 className="text-2xl font-black">
+                      {editandoIndex !== null ? 'Editar produto' : 'Adicionar produto'}
+                    </h1>
+
+                    <p
+                      className={`mt-1 text-sm ${
+                        modoNoturno ? 'text-gray-400' : 'text-gray-500'
+                      }`}
+                    >
+                      Preencha os dados do produto ou use o leitor de código.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={fecharModal}
+                    disabled={leitorAtivo}
+                    className={`
+                      w-10 h-10 rounded-2xl flex items-center justify-center text-xl font-black transition flex-shrink-0
+                      ${
+                        leitorAtivo
+                          ? 'bg-gray-500 text-gray-300 cursor-not-allowed'
+                          : modoNoturno
+                            ? 'bg-gray-900 hover:bg-gray-700 text-gray-300'
+                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                      }
+                    `}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="px-5 sm:px-6 py-5 space-y-4">
+                {leitorAtivo && (
+                  <div>
+                    <div className="relative w-full h-52 bg-black rounded-2xl overflow-hidden">
+                      <video
+                        id="video-scanner-somar"
+                        className="w-full h-full object-cover"
+                        autoPlay
+                        muted
+                      />
+
+                      <div className="absolute top-1/2 left-0 w-full h-[2px] bg-red-500 transform -translate-y-1/2 pointer-events-none" />
+                      <div className="absolute inset-0 border-4 border-green-500 opacity-60 pointer-events-none rounded-2xl" />
+                    </div>
+
+                    <p className="text-xs text-gray-400 mt-2">
+                      Aponte a câmera para o código de barras EAN.
+                    </p>
+                  </div>
                 )}
 
-				{/* Modal (DEVE FICAR FORA DO CONTAINER DE CONTEÚDO PARA FUNCIONAR COMO OVERLAY) */}
-				{isOpen && (
-					<div
-						className={`fixed inset-0 z-50 flex justify-center items-center p-4 transition-all ${
-							modoNoturno ? 'bg-gray-900/80 text-gray-100' : 'bg-black/60 text-gray-900'
-						}`}
-					>
-						<div
-							className={`w-full max-w-lg p-8 rounded-2xl shadow-2xl transition-all duration-300 ${
-								modoNoturno
-									? 'bg-gray-800 border border-gray-700'
-									: 'bg-white border border-gray-200'
-							}`}
-						>
-							<h1
-								className={`text-2xl font-bold mb-6 text-center ${
-									modoNoturno ? 'text-white' : 'text-gray-900'
-								}`}
-							>
-								{editandoIndex !== null ? "Editar Produto" : "Adicionar Produto"}
-							</h1>
+                <div>
+                  <label
+                    className={`block text-xs font-black uppercase tracking-wide mb-2 ${
+                      modoNoturno ? 'text-gray-400' : 'text-gray-500'
+                    }`}
+                  >
+                    EAN do produto
+                  </label>
 
+                  <input
+                    type="number"
+                    placeholder="Digite ou leia o código EAN"
+                    value={ean}
+                    onChange={(e) => setEan(e.target.value)}
+                    className={`
+                      w-full h-12 px-4 rounded-2xl border outline-none font-semibold transition-all focus:ring-4
+                      ${inputBase}
+                    `}
+                  />
+                </div>
 
-							{leitorAtivo && (
-								<div className="mb-4">
-									<div className="relative w-full h-48 bg-black rounded-lg overflow-hidden">
-										<video id="video" className="w-full h-full object-cover" autoPlay autoFocus focusMode muted />
-										
-										{/* Linha vermelha central */}
-										<div className="absolute top-1/2 left-0 w-full h-[2px] bg-red-500 transform -translate-y-1/2 pointer-events-none"></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    onClick={() => buscarProdutoPorEan(ean)}
+                    className="h-12 font-black rounded-2xl bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-all active:scale-95"
+                  >
+                    Buscar EAN
+                  </button>
 
-										{/* Borda do scanner (opcional) */}
-										<div className="absolute inset-0 border-4 border-green-500 opacity-60 pointer-events-none"></div>
-									</div>
+                  <button
+                    onClick={() => setLeitorAtivo((prev) => !prev)}
+                    className={`
+                      h-12 font-black rounded-2xl shadow-sm transition-all active:scale-95
+                      ${
+                        leitorAtivo
+                          ? 'bg-red-600 text-white hover:bg-red-700'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }
+                    `}
+                  >
+                    {leitorAtivo ? 'Parar leitura' : 'Ler código'}
+                  </button>
+                </div>
 
-									<p className="text-xs text-gray-400 mt-2">
-										Aponte a câmera para o código de barras (EAN). O preenchimento será automático.
-									</p>
-								</div>
-							)}
+                <div>
+                  <label
+                    className={`block text-xs font-black uppercase tracking-wide mb-2 ${
+                      modoNoturno ? 'text-gray-400' : 'text-gray-500'
+                    }`}
+                  >
+                    Produto
+                  </label>
 
-							<div className="flex flex-col gap-4 mb-4">
-							{/* Campo EAN */}
-							<input
-								type="number"
-								placeholder="EAN do Produto"
-								value={ean}
-								onChange={(e) => setEan(e.target.value)}
-								className={`border rounded-xl p-3 focus:ring-2 focus:outline-none transition ${
-									modoNoturno
-										? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400'
-										: 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500'
-								}`}
-							/>
+                  <input
+                    type="text"
+                    placeholder="Nome do produto"
+                    value={nomeProduto}
+                    onChange={(e) => setNomeProduto(e.target.value)}
+                    className={`
+                      w-full h-12 px-4 rounded-2xl border outline-none font-semibold transition-all focus:ring-4
+                      ${inputBase}
+                    `}
+                  />
+                </div>
 
-							{/* Botões: Buscar e Ler Código */}
-							<div className="flex gap-3">
-								<button
-									onClick={() => buscarProdutoPorEan(ean)}
-									className={`flex-1 font-semibold rounded-xl py-2.5 shadow-sm transition-all active:scale-95 ${
-										modoNoturno
-											? 'bg-blue-500 text-white hover:bg-blue-600'
-											: 'bg-blue-600 text-white hover:bg-blue-700'
-									}`}
-								>
-									Buscar
-								</button>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      className={`block text-xs font-black uppercase tracking-wide mb-2 ${
+                        modoNoturno ? 'text-gray-400' : 'text-gray-500'
+                      }`}
+                    >
+                      Valor
+                    </label>
 
-								<button
-									onClick={() => setLeitorAtivo(!leitorAtivo)}
-									className={`flex-1 font-semibold rounded-xl py-2.5 shadow-sm transition-all active:scale-95 ${
-										leitorAtivo
-											? 'bg-red-600 text-white hover:bg-red-700'
-											: modoNoturno
-											? 'bg-green-500 text-white hover:bg-green-600'
-											: 'bg-green-600 text-white hover:bg-green-700'
-									}`}
-								>
-									{leitorAtivo ? "Parar Leitura" : "Ler Código"}
-								</button>
-							</div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="R$"
+                      value={valorProduto}
+                      onChange={(e) => setValorProduto(e.target.value)}
+                      className={`
+                        w-full h-12 px-4 rounded-2xl border outline-none font-semibold transition-all focus:ring-4
+                        ${inputBase}
+                      `}
+                    />
+                  </div>
 
-							{/* Campos de informações */}
-							<input
-								type="text"
-								placeholder="Nome do Produto"
-								value={nomeProduto}
-								onChange={(e) => setNomeProduto(e.target.value)}
-								className={`border rounded-xl p-3 focus:ring-2 focus:outline-none transition ${
-									modoNoturno
-										? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400'
-										: 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500'
-								}`}
-							/>
+                  <div>
+                    <label
+                      className={`block text-xs font-black uppercase tracking-wide mb-2 ${
+                        modoNoturno ? 'text-gray-400' : 'text-gray-500'
+                      }`}
+                    >
+                      Quantidade
+                    </label>
 
-							<div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
-								<input
-									type="number"
-									placeholder="Valor (R$)"
-									value={valorProduto}
-									onChange={(e) => setValorProduto(e.target.value)}
-									className={`border rounded-xl p-3 focus:ring-2 focus:outline-none transition ${
-										modoNoturno
-											? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400'
-											: 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500'
-									}`}
-								/>
-								<input
-									type="number"
-									placeholder="Quantidade"
-									value={quantidadeProduto}
-									onChange={(e) => setQuantidadeProduto(e.target.value)}
-									className={`border rounded-xl p-3 focus:ring-2 focus:outline-none transition ${
-										modoNoturno
-											? 'bg-gray-700 border-gray-600 text-gray-100 focus:ring-blue-400'
-											: 'bg-white border-gray-300 text-gray-700 focus:ring-blue-500'
-									}`}
-								/>
-							</div>
+                    <input
+                      type="number"
+                      placeholder="Qtd."
+                      value={quantidadeProduto}
+                      onChange={(e) => setQuantidadeProduto(e.target.value)}
+                      className={`
+                        w-full h-12 px-4 rounded-2xl border outline-none font-semibold transition-all focus:ring-4
+                        ${inputBase}
+                      `}
+                    />
+                  </div>
+                </div>
 
-							{/* Botões: Adicionar/Atualizar e Cancelar */}
-							<div className="flex gap-3 mt-2">
-								<button
-									onClick={handleAddProduto}
-									className={`flex-1 font-semibold rounded-xl py-2.5 shadow-sm transition-all active:scale-95 ${
-										modoNoturno
-											? 'bg-blue-500 text-white hover:bg-blue-600'
-											: 'bg-blue-600 text-white hover:bg-blue-700'
-									}`}
-								>
-									{editandoIndex !== null ? "Atualizar Produto" : "Adicionar Produto"}
-								</button>
-								<button
-									onClick={() => {
-										// Parar o leitor de forma segura antes de fechar o modal
-										if (leitorAtivo) {
-											if (codeReaderRef.current) codeReaderRef.current.reset();
-											setLeitorAtivo(false);
-										}
-										setIsOpen(false);
-										setErro("");
-										setEditandoIndex(null);
-										setEan("");
-										setNomeProduto("");
-										setValorProduto("");
-										setQuantidadeProduto("");
-									}}
-									// O botão de cancelar só fica desativado se o leitor estiver realmente ativo e não tiver sido parado
-									disabled={leitorAtivo} 
-									className={`flex-1 font-semibold rounded-xl py-2.5 shadow-sm transition-all active:scale-95 ${
-										leitorAtivo
-											? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-											: modoNoturno
-											? 'bg-red-500 text-white hover:bg-red-600'
-											: 'bg-red-600 text-white hover:bg-red-700'
-									}`}
-								>
-									{leitorAtivo ? "Leitor Ativo..." : "Cancelar"}
-								</button>
-							</div>
-							</div>
+                {erro && (
+                  <p className="text-red-500 font-black text-sm text-center">
+                    {erro}
+                  </p>
+                )}
+              </div>
 
-							{erro && <p className="text-red-500 font-medium mt-2">{erro}</p>}
-						</div>
-					</div>
-				)} 
-			</main>
-		</div>
-	);
+              <div
+                className={`
+                  px-5 sm:px-6 py-5 border-t grid grid-cols-1 sm:grid-cols-2 gap-3
+                  ${modoNoturno ? 'border-gray-700' : 'border-gray-200'}
+                `}
+              >
+                <button
+                  type="button"
+                  onClick={fecharModal}
+                  disabled={leitorAtivo}
+                  className={`
+                    h-12 rounded-2xl font-black transition-all active:scale-95
+                    ${
+                      leitorAtivo
+                        ? 'bg-gray-500 text-gray-300 cursor-not-allowed'
+                        : modoNoturno
+                          ? 'bg-gray-900 hover:bg-gray-700 text-gray-300'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }
+                  `}
+                >
+                  {leitorAtivo ? 'Leitor ativo...' : 'Cancelar'}
+                </button>
+
+                <button
+                  onClick={handleAddProduto}
+                  className="
+                    h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white
+                    font-black transition-all active:scale-95 shadow-lg shadow-blue-600/20
+                  "
+                >
+                  {editandoIndex !== null ? 'Atualizar' : 'Adicionar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
 };
 
 export default SomarValor;

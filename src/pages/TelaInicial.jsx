@@ -220,7 +220,7 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
         </div>
 
         <div className="flex-grow overflow-y-auto p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
             {opcoesPrincipais.map((item) => {
               const selected = option === item.id;
 

@@ -469,16 +469,6 @@ const TelaInicial = ({ onSelectOption, onLogoutSuccess, usuarioLogado }) => {
             ☰
           </button>
 
-          <div className="text-center">
-            <p className="text-sm font-black">Lista de Compras</p>
-            <p
-              className={`text-xs ${
-                modoNoturno ? 'text-gray-400' : 'text-gray-500'
-              }`}
-            >
-              Online
-            </p>
-          </div>
 
           <div className="w-11" />
         </header>
